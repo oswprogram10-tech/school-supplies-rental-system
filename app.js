@@ -11,7 +11,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const fdb = firebase.firestore();
 
-// ===================== DATA =====================
+// ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','기타':'📦' };
 
 let db = { items: [], history: [] };
@@ -19,12 +19,11 @@ let currentUser = null;
 let selectedRole = 'teacher';
 let activeListeners = []; 
 let hasCheckedOverdue = false;
-let scannerInstance = null; // QR 스캐너 인스턴스
+let scannerInstance = null;
 
 // ===================== AUTH & NAVIGATION =====================
 function selectRole(role) {
   selectedRole = role;
-  console.log("역할 선택됨:", role);
   const btnT = document.getElementById('roleTeacher');
   const btnS = document.getElementById('roleStudent');
   if (btnT) btnT.classList.toggle('active', role === 'teacher');
@@ -94,10 +93,10 @@ async function handleFindAuth(e) {
     const snapshot = await fdb.collection("users").where("name", "==", name).get();
     if (snapshot.empty) resultBox.innerHTML = "정보 없음";
     else {
-      let html = "";
+      let html = "<strong>조회 결과:</strong><br>";
       snapshot.forEach(doc => {
         const d = doc.data();
-        html += `ID: ${doc.id} / PW: ${d.pw} (${d.classCode})<br>`;
+        html += `아이디: ${doc.id} / 비번: ${d.pw} (학급: ${d.classCode})<br>`;
       });
       resultBox.innerHTML = html;
     }
@@ -107,6 +106,7 @@ async function handleFindAuth(e) {
 
 function logout() {
   activeListeners.forEach(unsub => unsub());
+  stopScan();
   currentUser = null;
   showPage('page-login');
 }
@@ -125,7 +125,7 @@ function showStudent() {
   studentTab('catalog');
 }
 
-// ===================== SYNC & DATA =====================
+// ===================== SYNC & REALTIME =====================
 function initRealtimeSync(classCode) {
   activeListeners.forEach(unsub => unsub());
   activeListeners = [];
@@ -136,14 +136,14 @@ function initRealtimeSync(classCode) {
       db.items = snap.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
       if (db.items.length === 0 && currentUser.role === 'teacher') seedInitialData(classCode);
       refreshCurrentUI();
-      if (currentUser.role === 'student') checkOverdueAlert();
+      if (currentUser && currentUser.role === 'student') checkOverdueAlert();
     });
 
   const historyUnsub = fdb.collection("history").where("classCode", "==", classCode)
     .onSnapshot(snap => {
       db.history = snap.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
       refreshCurrentUI();
-      if (currentUser.role === 'student') checkOverdueAlert();
+      if (currentUser && currentUser.role === 'student') checkOverdueAlert();
     });
 
   activeListeners.push(itemsUnsub, historyUnsub);
@@ -157,9 +157,15 @@ function checkOverdueAlert() {
     return item && (Date.now() - new Date(h.borrowedAt)) > item.maxDays * 86400000;
   });
   if (overdue.length > 0) {
-    alert("⚠️ 연체된 비품이 있습니다! 즉시 반납해 주세요.");
+    alert("⚠️ 연체된 비품이 있습니다! 목록에서 확인 후 반납해 주세요.");
     hasCheckedOverdue = true;
   }
+}
+
+function refreshCurrentUI() {
+  const page = document.querySelector('.page.active')?.id;
+  if (page === 'page-admin') adminTab(document.querySelector('.tab-content.active')?.id.replace('tab-',''));
+  if (page === 'page-student') studentTab(document.querySelector('.student-tab-content.active')?.id.replace('stTab-',''));
 }
 
 async function seedInitialData(classCode) {
@@ -171,18 +177,14 @@ async function seedInitialData(classCode) {
   for (const it of items) await fdb.collection("items").doc(`${classCode}-${it.id}`).set(it);
 }
 
-function refreshCurrentUI() {
-  const page = document.querySelector('.page.active')?.id;
-  if (page === 'page-admin') adminTab(document.querySelector('.tab-content.active')?.id.replace('tab-',''));
-  if (page === 'page-student') studentTab(document.querySelector('.student-tab-content.active')?.id.replace('stTab-',''));
-}
-
-// ===================== TABS & RENDER =====================
+// ===================== TABS & RENDERING =====================
 function adminTab(tab) {
   if (!tab) tab = 'dashboard';
   document.querySelectorAll('.tab-content, .sidebar-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
-  document.getElementById('sideBtn-' + tab).classList.add('active');
+  const btn = document.getElementById('sideBtn-' + tab);
+  if (btn) btn.classList.add('active');
+
   if (tab === 'dashboard') renderDashboard();
   else if (tab === 'items') renderItems();
   else if (tab === 'history') renderHistory();
@@ -191,64 +193,15 @@ function adminTab(tab) {
 
 function studentTab(tab) {
   if (!tab) tab = 'catalog';
-  stopScan(); // 다른 탭 이동 시 카메라 자동 정지
+  stopScan();
   document.querySelectorAll('.student-tab-content, .student-tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('stTab-' + tab).classList.add('active');
-  document.getElementById('stBtn-' + tab).classList.add('active');
+  const btn = document.getElementById('stBtn-' + tab);
+  if (btn) btn.classList.add('active');
+
   if (tab === 'myborrow') renderMyBorrow();
   else if (tab === 'catalog') renderCatalog();
-}
-
-// ===================== QR SCANNER LOGIC =====================
-function startScan() {
-  const readerId = "qr-reader";
-  if (!document.getElementById(readerId)) return;
-  
-  stopScan(); // 이미 작동 중이면 중지
-
-  scannerInstance = new Html5Qrcode(readerId);
-  const config = { fps: 15, qrbox: { width: 250, height: 250 } };
-
-  scannerInstance.start(
-    { facingMode: "environment" },
-    config,
-    (decodedText) => {
-      console.log("QR 스캔 성공:", decodedText);
-      stopScan(); // 스캔 성공 시 카메라 정지
-      processQR(decodedText);
-    },
-    (errorMessage) => { /* 에러 무시 */ }
-  ).catch(err => {
-    alert("카메라를 열 수 없습니다. 브라우저의 카메라 권한을 허용해 주세요.");
-    console.error("Camera Start Error:", err);
-  });
-}
-
-function stopScan() {
-  if (scannerInstance && scannerInstance.isScanning) {
-    scannerInstance.stop().then(() => {
-      console.log("카메라 정지 완료");
-    }).catch(err => console.error("Camera Stop Error:", err));
-  }
-}
-
-function processQR(itemId) {
-  const it = db.items.find(i => i.id === itemId);
-  if (!it) {
-    alert("올바르지 않은 비품 QR코드입니다.");
-    return;
-  }
-  document.getElementById('borrowItemName').textContent = it.name;
-  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
-  
-  if (active && active.studentId !== currentUser.id && currentUser.role !== 'teacher') {
-    alert("다른 친구가 사용 중인 비품입니다.");
-    return;
-  }
-
-  document.getElementById('borrowConfirmMsg').textContent = active ? '이 비품을 반납하시겠습니까?' : '이 비품을 대여하시겠습니까?';
-  openModal('modal-borrow');
-  window.pendingItemId = itemId;
+  else if (tab === 'scan') startScan();
 }
 
 function renderDashboard() {
@@ -256,11 +209,12 @@ function renderDashboard() {
   document.getElementById('statTotalItems').textContent = db.items.length;
   document.getElementById('statBorrowed').textContent = borrowed;
   document.getElementById('statAvailable').textContent = db.items.length - borrowed;
+  
   const list = document.getElementById('currentBorrowList');
   const active = db.history.filter(h => !h.returnedAt);
   list.innerHTML = active.length ? active.map(h => {
     const it = db.items.find(i => i.id === h.itemId);
-    return `<div class="borrow-item"><div class="borrow-item-info">${it?.name} (${h.studentName})</div></div>`;
+    return `<div class="borrow-item">${it?.name || '정보없음'} (${h.studentName})</div>`;
   }).join('') : '대여 중인 비품 없음';
 }
 
@@ -270,7 +224,7 @@ function renderItems() {
     const st = getItemStatus(it);
     const active = db.history.find(h => h.itemId === it.id && !h.returnedAt);
     return `<div class="item-card">
-      <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
+      <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
       <div class="item-card-name">${it.name}</div>
       <div class="item-status-badge status-${st.css}">${st.label}${active ? ' ('+active.studentName+')':''}</div>
       <div class="item-card-actions">
@@ -287,7 +241,7 @@ function renderCatalog() {
   g.innerHTML = db.items.map(it => {
     const st = getItemStatus(it);
     return `<div class="item-card" onclick="processQR('${it.id}')">
-      <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
+      <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
       <div class="item-card-name">${it.name}</div>
       <div class="item-status-badge status-${st.css}">${st.label}</div>
     </div>`;
@@ -304,32 +258,94 @@ function renderHistory() {
 function renderStudents() {
   const list = document.getElementById('studentsList');
   fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").get().then(snap => {
-    list.innerHTML = snap.docs.map(doc => `<div class="student-card">🎒 ${doc.data().name}</div>`).join('');
+    list.innerHTML = snap.docs.map(doc => `<div class="student-card">🎒 ${doc.data().name} (${doc.id})</div>`).join('');
   });
 }
 
 function renderMyBorrow() {
   const active = db.history.filter(h => h.studentId === currentUser.id && !h.returnedAt);
   document.getElementById('myBorrowList').innerHTML = active.map(h => `<div class="my-borrow-card">
-    <b>${db.items.find(i=>i.id===h.itemId)?.name}</b> (대여일: ${fmt(h.borrowedAt)})
-    <button class="btn-secondary" onclick="processQR('${h.itemId}')">반납</button>
+    <b>${db.items.find(i=>i.id===h.itemId)?.name || h.itemId}</b> (대여일: ${fmt(h.borrowedAt)})
+    <button class="btn-secondary" onclick="processQR('${h.itemId}')">반납하기</button>
   </div>`).join('');
 }
 
-// ===================== QR & MODALS =====================
+// ===================== QR & SCAN =====================
+function startScan() {
+  const readerId = "qr-reader";
+  if (!document.getElementById(readerId)) return;
+  stopScan();
+  scannerInstance = new Html5Qrcode(readerId);
+  scannerInstance.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
+    stopScan();
+    processQR(decodedText);
+  }, () => {}).catch(err => {
+    console.error(err);
+    alert("카메라를 열 수 없습니다. 권한을 확인하세요.");
+  });
+}
+
+function stopScan() {
+  if (scannerInstance && scannerInstance.isScanning) {
+    scannerInstance.stop().catch(err => console.error(err));
+  }
+}
+
+function manualScan() {
+  const id = document.getElementById('manualQrInput').value.trim();
+  if (id) processQR(id);
+}
+
+function processQR(itemId) {
+  const it = db.items.find(i => i.id === itemId);
+  if (!it) { alert("올바르지 않은 비품 QR입니다."); return; }
+  
+  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
+  if (active && active.studentId !== currentUser.id && currentUser.role !== 'teacher') {
+    alert("다른 사람이 대여 중인 비품입니다."); return;
+  }
+
+  document.getElementById('borrowItemName').textContent = it.name;
+  document.getElementById('borrowConfirmMsg').textContent = active ? '이 비품을 반납하시겠습니까?' : '이 비품을 대여하시겠습니까?';
+  openModal('modal-borrow');
+  window.pendingItemId = itemId;
+}
+
+async function confirmBorrow() {
+  const itemId = window.pendingItemId;
+  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
+  if (active) {
+    await fdb.collection("history").doc(active.firestoreId).update({ returnedAt: new Date().toISOString() });
+  } else {
+    await fdb.collection("history").add({
+      itemId, studentId: currentUser.id, studentName: currentUser.name, 
+      borrowedAt: new Date().toISOString(), returnedAt: null, classCode: currentUser.classCode
+    });
+  }
+  closeModal('modal-borrow');
+}
+
+// ===================== MODALS & UTILS =====================
 function showQR(itemId) {
   const item = db.items.find(i => i.id === itemId);
   document.getElementById('qrItemName').textContent = item.name;
-  document.getElementById('qrItemId').textContent = itemId;
-  document.getElementById('qrCodeCanvas').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${itemId}&size=200x200" />`;
+  document.getElementById('qrCodeCanvas').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${itemId}&size=200x200" style="border-radius:8px;" />`;
   openModal('modal-qr');
+}
+
+function printQR() {
+  const content = document.getElementById('qrCodeCanvas').innerHTML;
+  const win = window.open('', '', 'width=400,height=400');
+  win.document.write('<html><body style="text-align:center;">' + content + '<h2>' + document.getElementById('qrItemName').textContent + '</h2></body></html>');
+  win.document.close();
+  win.print();
 }
 
 function previewImage(input) {
   if (input.files && input.files[0]) {
     const reader = new FileReader();
     reader.onload = e => {
-      document.getElementById('imagePreview').innerHTML = `<img src="${e.target.result}" style="width:100%" />`;
+      document.getElementById('imagePreview').innerHTML = `<img src="${e.target.result}" style="width:100%; border-radius:8px;">`;
       document.getElementById('itemImageData').value = e.target.result;
     };
     reader.readAsDataURL(input.files[0]);
@@ -341,7 +357,7 @@ function openAddItemModal() {
   document.getElementById('editItemId').value = '';
   document.getElementById('itemName').value = '';
   document.getElementById('itemImageData').value = '';
-  document.getElementById('imagePreview').innerHTML = '사진 선택';
+  document.getElementById('imagePreview').innerHTML = '사진 미리보기';
   openModal('modal-item');
 }
 
@@ -353,7 +369,7 @@ function openEditItem(id) {
   document.getElementById('itemCategory').value = it.category;
   document.getElementById('itemMaxDays').value = it.maxDays;
   document.getElementById('itemImageData').value = it.imgData || '';
-  document.getElementById('imagePreview').innerHTML = it.imgData ? `<img src="${it.imgData}" style="width:100%">` : '사진 선택';
+  document.getElementById('imagePreview').innerHTML = it.imgData ? `<img src="${it.imgData}" style="width:100%">` : '사진 미리보기';
   openModal('modal-item');
 }
 
@@ -376,26 +392,6 @@ async function deleteItem(id) {
   if (confirm('삭제하시겠습니까?')) await fdb.collection("items").doc(id).delete();
 }
 
-function processQR(itemId) {
-  const it = db.items.find(i => i.id === itemId);
-  document.getElementById('borrowItemName').textContent = it.name;
-  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
-  document.getElementById('borrowConfirmMsg').textContent = active ? '반납하시겠습니까?' : '대여하시겠습니까?';
-  openModal('modal-borrow');
-  window.pendingItemId = itemId;
-}
-
-async function confirmBorrow() {
-  const itemId = window.pendingItemId;
-  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
-  if (active) await fdb.collection("history").doc(active.firestoreId).update({ returnedAt: new Date().toISOString() });
-  else await fdb.collection("history").add({
-    itemId, studentId: currentUser.id, studentName: currentUser.name, 
-    borrowedAt: new Date().toISOString(), returnedAt: null, classCode: currentUser.classCode
-  });
-  closeModal('modal-borrow');
-}
-
 function getItemStatus(it) {
   const active = db.history.find(h => h.itemId === it.id && !h.returnedAt);
   if (!active) return { status:'available', label:'대여 가능', css:'available' };
@@ -405,5 +401,7 @@ function getItemStatus(it) {
 function fmt(iso) { return iso ? iso.split('T')[0] : '-'; }
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
+function toggleGradeField() { /* 더 이상 사용되지 않음 */ }
 
 document.addEventListener('DOMContentLoaded', () => { showPage('page-login'); });
