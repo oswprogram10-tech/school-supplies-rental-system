@@ -248,19 +248,16 @@ function renderItems() {
 
     return `<div class="item-card ${st.status==='available'?'':'unavailable'}">
       ${imageHtml}
-      <div class="item-qr-preview" onclick="showQR('${item.id}')">
-        <img data-qr-id="${item.id}" alt="QR" />
-      </div>
       <div class="item-card-name">${item.name}</div>
       <div class="item-card-cat">${item.category}</div>
       <div class="item-status-badge status-${st.css}">${st.label}${active ? ' · '+active.studentName : ''}</div>
       <div class="item-card-actions">
+        <button class="btn-icon" onclick="showQR('${item.id}')">🔍 QR 보기</button>
         <button class="btn-icon" onclick="openEditItem('${item.id}')">✏️ 수정</button>
         <button class="btn-danger" onclick="deleteItem('${item.id}')">🗑️ 삭제</button>
       </div>
     </div>`;
   }).join('');
-  generateAllQRs();
 }
 
 function renderCatalog() {
@@ -278,6 +275,7 @@ function renderCatalog() {
       <div class="item-card-name">${item.name}</div>
       <div class="item-card-cat">${item.category} · 최대 ${item.maxDays}일</div>
       <div class="item-status-badge status-${st.css}">${st.label}</div>
+      <div class="item-meta">클릭하여 대여/반납하기</div>
     </div>`;
   }).join('');
 }
