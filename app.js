@@ -365,6 +365,27 @@ function renderMyBorrow() {
     </div>`;
   }).join('');
 }
+// ===================== STUDENT: CATALOG =====================
 function renderCatalog() {
-  renderItems(); // 관리자 렌더링 함수 재사용 가능하도록 설계됨
+  const g = document.getElementById('catalogGrid');
+  if (!g) return;
+  if (!db.items.length) { 
+    g.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><p>등록된 비품이 없습니다</p></div>'; 
+    return; 
+  }
+  g.innerHTML = db.items.map(item => {
+    const st = getItemStatus(item);
+    const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
+    return `<div class="item-card ${st.status==='available'?'':'unavailable'}" onclick="processQR('${item.id}')">
+      <div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>
+      <div class="item-qr-preview">
+        <img data-qr-id="${item.id}" alt="QR" />
+      </div>
+      <div class="item-card-name">${item.name}</div>
+      <div class="item-card-cat">${item.category} · 최대 ${item.maxDays}일</div>
+      <div class="item-status-badge status-${st.css}">${st.label}${active&&active.studentId===currentUser.id?' (내가 대여 중)':''}</div>
+      <div class="item-meta">클릭하여 대여/반납하기</div>
+    </div>`;
+  }).join('');
+  generateAllQRs();
 }
