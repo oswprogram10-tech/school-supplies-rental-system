@@ -262,3 +262,35 @@ body { font-family: 'Pretendard', 'Segoe UI', sans-serif; background: var(--bg);
   #modal-qr, #modal-qr * { visibility: visible; }
   #modal-qr { position: absolute; top: 0; left: 0; background: white; padding: 40px; text-align: center; }
 }
+
+/* NEW: LOGIN FOOTER & FIND AUTH */
+.login-footer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.login-footer a {
+  color: var(--text2);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.login-footer a:hover {
+  color: var(--accent);
+}
+.login-footer .divider {
+  color: var(--border);
+}
+.find-result-box {
+  background: var(--bg3);
+  padding: 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  border-left: 4px solid var(--accent);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.find-result-box b {
+  color: var(--accent2);
+}

@@ -49,18 +49,77 @@
       </div>
       <div id="loginError" class="login-error hidden">아이디 또는 비밀번호가 올바르지 않습니다.</div>
       <button type="submit" class="btn-primary login-btn">로그인</button>
+      <div class="login-footer">
+        <a href="#" onclick="showPage('page-signup')">회원가입</a>
+        <span class="divider">|</span>
+        <a href="#" onclick="showPage('page-find-auth')">아이디/비밀번호 찾기</a>
+      </div>
     </form>
     <div class="login-hint">
       <details>
         <summary>🔑 테스트 계정 보기</summary>
         <div class="hint-content">
           <div class="hint-row"><b>교사:</b> teacher / teacher123</div>
-          <div class="hint-row"><b>학생:</b> student1 / pass1234 (김민준)</div>
-          <div class="hint-row"><b>학생:</b> student2 / pass1234 (이서연)</div>
-          <div class="hint-row"><b>학생:</b> student3 / pass1234 (박지호)</div>
+          <div class="hint-row"><b>학생:</b> student1 / pass1234</div>
         </div>
       </details>
     </div>
+  </div>
+</div>
+
+<!-- ===================== SIGNUP PAGE ===================== -->
+<div id="page-signup" class="page">
+  <div class="login-container">
+    <div class="login-header">
+      <h1 class="login-title">회원가입</h1>
+      <p class="login-subtitle">정보를 입력하여 계정을 생성하세요</p>
+    </div>
+    <form class="login-form" onsubmit="handleSignUp(event)">
+      <div class="form-group">
+        <label>구분 <span class="required">*</span></label>
+        <select id="signupRole" onchange="toggleGradeField()">
+          <option value="student">학생</option>
+          <option value="teacher">교사 (관리자)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>아이디 <span class="required">*</span></label>
+        <input type="text" id="signupId" placeholder="사용할 아이디 입력" required />
+      </div>
+      <div class="form-group">
+        <label>비밀번호 <span class="required">*</span></label>
+        <input type="password" id="signupPw" placeholder="비밀번호 입력" required />
+      </div>
+      <div class="form-group">
+        <label>성명 <span class="required">*</span></label>
+        <input type="text" id="signupName" placeholder="실명 입력" required />
+      </div>
+      <div class="form-group" id="gradeField">
+        <label>학년/반</label>
+        <input type="text" id="signupGrade" placeholder="예: 3학년 2반" />
+      </div>
+      <button type="submit" class="btn-primary login-btn">가입하기</button>
+      <button type="button" class="btn-secondary login-btn" onclick="showPage('page-login')">취소</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== FIND AUTH PAGE ===================== -->
+<div id="page-find-auth" class="page">
+  <div class="login-container">
+    <div class="login-header">
+      <h1 class="login-title">계정 찾기</h1>
+      <p class="login-subtitle">가입 시 입력한 성명을 입력하세요</p>
+    </div>
+    <form class="login-form" onsubmit="handleFindAuth(event)">
+      <div class="form-group">
+        <label>성명</label>
+        <input type="text" id="findName" placeholder="가입한 성명 입력" required />
+      </div>
+      <div id="findResult" class="find-result-box hidden"></div>
+      <button type="submit" class="btn-primary login-btn">찾기</button>
+      <button type="button" class="btn-secondary login-btn" onclick="showPage('page-login')">돌아가기</button>
+    </form>
   </div>
 </div>
 
