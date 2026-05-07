@@ -120,10 +120,14 @@
 <!-- ===================== ADMIN PAGE ===================== -->
 <div id="page-admin" class="page">
   <nav class="navbar">
-    <div class="nav-brand">
-      <span class="nav-logo">📚</span>
-      <span class="nav-title">교실 비품 관리</span>
-      <span class="nav-badge admin-badge">관리자</span>
+    <div class="nav-left">
+      <div class="logo">🍏 학급 비품 대여</div>
+      <div class="nav-menu">
+        <button id="sideBtn-dashboard" class="nav-menu-btn active" onclick="adminTab('dashboard')">대시보드</button>
+        <button id="sideBtn-items" class="nav-menu-btn" onclick="adminTab('items')">비품 관리</button>
+        <button id="sideBtn-history" class="nav-menu-btn" onclick="adminTab('history')">대여 이력</button>
+        <button id="sideBtn-students" class="nav-menu-btn" onclick="adminTab('students')">학생 관리</button>
+      </div>
     </div>
     <div class="nav-right">
       <div class="nav-user"><span id="adminUserName">관리자</span> <span id="adminClassBadge" class="nav-badge admin-badge">-</span></div>
@@ -131,24 +135,7 @@
     </div>
   </nav>
 
-  <div class="admin-layout">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <button class="sidebar-btn active" id="sideBtn-dashboard" onclick="adminTab('dashboard')">
-        <span>📊</span> 대시보드
-      </button>
-      <button class="sidebar-btn" id="sideBtn-items" onclick="adminTab('items')">
-        <span>📦</span> 비품 관리
-      </button>
-      <button class="sidebar-btn" id="sideBtn-history" onclick="adminTab('history')">
-        <span>📋</span> 대여 이력
-      </button>
-      <button class="sidebar-btn" id="sideBtn-students" onclick="adminTab('students')">
-        <span>👥</span> 학생 현황
-      </button>
-    </aside>
-
-    <!-- Main Content -->
+  <div class="main-layout">
     <main class="admin-main">
       <!-- Dashboard Tab -->
       <div id="tab-dashboard" class="tab-content active">
@@ -256,10 +243,13 @@
 <!-- ===================== STUDENT PAGE ===================== -->
 <div id="page-student" class="page">
   <nav class="navbar student-nav">
-    <div class="nav-brand">
-      <span class="nav-logo">📚</span>
-      <span class="nav-title">비품 대여</span>
-      <span class="nav-badge student-badge">학생</span>
+    <div class="nav-left">
+      <div class="logo">🍏 학급 비품 대여</div>
+      <div class="nav-menu">
+        <button id="stBtn-catalog" class="nav-menu-btn active" onclick="studentTab('catalog')">비품 목록</button>
+        <button id="stBtn-scan" class="nav-menu-btn" onclick="studentTab('scan')">QR 스캔</button>
+        <button id="stBtn-myborrow" class="nav-menu-btn" onclick="studentTab('myborrow')">내 대여 현황</button>
+      </div>
     </div>
     <div class="nav-right">
       <div class="nav-user"><span id="studentUserName">사용자</span> <span id="studentClassBadge" class="nav-badge student-badge">-</span></div>
@@ -267,20 +257,6 @@
     </div>
   </nav>
 
-  <div class="student-layout">
-    <div class="student-tabs">
-      <button class="student-tab-btn active" id="stBtn-scan" onclick="studentTab('scan')">📷 QR 스캔</button>
-      <button class="student-tab-btn" id="stBtn-myborrow" onclick="studentTab('myborrow')">📋 내 대여 목록</button>
-      <button class="student-tab-btn" id="stBtn-catalog" onclick="studentTab('catalog')">📦 비품 목록</button>
-    </div>
-
-    <!-- QR Scan Tab -->
-    <div id="stTab-scan" class="student-tab-content active">
-      <div class="scan-container">
-        <div class="scan-header">
-          <h2>QR코드 스캔</h2>
-          <p>비품에 부착된 QR코드를 스캔하여 대여 또는 반납하세요</p>
-        </div>
         <div class="scan-area">
           <div id="qr-reader" class="qr-reader-box"></div>
           <div id="scan-result" class="scan-result hidden"></div>

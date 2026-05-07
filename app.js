@@ -180,9 +180,13 @@ function refreshCurrentUI() {
 // ===================== TABS & RENDER =====================
 function adminTab(tab) {
   if (!tab) tab = 'dashboard';
-  document.querySelectorAll('.tab-content, .sidebar-btn').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-menu-btn').forEach(el => el.classList.remove('active'));
+  
   document.getElementById('tab-' + tab).classList.add('active');
-  document.getElementById('sideBtn-' + tab).classList.add('active');
+  const activeBtn = document.getElementById('sideBtn-' + tab);
+  if (activeBtn) activeBtn.classList.add('active');
+  
   if (tab === 'dashboard') renderDashboard();
   else if (tab === 'items') renderItems();
   else if (tab === 'history') renderHistory();
@@ -191,10 +195,14 @@ function adminTab(tab) {
 
 function studentTab(tab) {
   if (!tab) tab = 'catalog';
-  stopScan(); // 다른 탭 이동 시 카메라 자동 정지
-  document.querySelectorAll('.student-tab-content, .student-tab-btn').forEach(el => el.classList.remove('active'));
+  stopScan(); 
+  document.querySelectorAll('.student-tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-menu-btn').forEach(el => el.classList.remove('active'));
+  
   document.getElementById('stTab-' + tab).classList.add('active');
-  document.getElementById('stBtn-' + tab).classList.add('active');
+  const activeBtn = document.getElementById('stBtn-' + tab);
+  if (activeBtn) activeBtn.classList.add('active');
+  
   if (tab === 'myborrow') renderMyBorrow();
   else if (tab === 'catalog') renderCatalog();
 }
