@@ -72,7 +72,7 @@
   <div class="login-container">
     <div class="login-header">
       <h1 class="login-title">회원가입</h1>
-      <p class="login-subtitle">정보를 입력하여 계정을 생성하세요</p>
+      <p class="login-subtitle">선생님이 정한 <b>학급 코드</b>를 공유해서 입력하세요</p>
     </div>
     <form class="login-form" onsubmit="handleSignUp(event)">
       <div class="form-group">
@@ -81,6 +81,10 @@
           <option value="student">학생</option>
           <option value="teacher">교사 (관리자)</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label>학급 코드 <span class="required">*</span></label>
+        <input type="text" id="signupClassCode" placeholder="예: 3-2 (교사/학생 동일하게 입력)" required />
       </div>
       <div class="form-group">
         <label>아이디 <span class="required">*</span></label>
@@ -93,10 +97,6 @@
       <div class="form-group">
         <label>성명 <span class="required">*</span></label>
         <input type="text" id="signupName" placeholder="실명 입력" required />
-      </div>
-      <div class="form-group" id="gradeField">
-        <label>학년/반</label>
-        <input type="text" id="signupGrade" placeholder="예: 3학년 2반" />
       </div>
       <button type="submit" class="btn-primary login-btn">가입하기</button>
       <button type="button" class="btn-secondary login-btn" onclick="showPage('page-login')">취소</button>

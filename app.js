@@ -8,7 +8,6 @@ const firebaseConfig = {
   appId: "1:212323277172:web:6828275c6779c54f2cb421"
 };
 
-// Firebase 초기화
 firebase.initializeApp(firebaseConfig);
 const fdb = firebase.firestore();
 
@@ -18,58 +17,60 @@ const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬'
 let db = { items: [], history: [] };
 let currentUser = null;
 let selectedRole = 'teacher';
-let scannerInstance = null;
-let pendingBorrowItemId = null;
+let activeListeners = []; // 실시간 리스너 관리용
 
-// ===================== REAL-TIME SYNC =====================
-function initRealtimeSync() {
-  console.log("📡 Firebase 연결 시도 중...");
+// ===================== REAL-TIME SYNC (학급별 격리) =====================
+function initRealtimeSync(classCode) {
+  // 기존 리스너가 있다면 해제 (로그아웃 후 재로그인 대비)
+  activeListeners.forEach(unsub => unsub());
+  activeListeners = [];
+
+  console.log(`📡 [${classCode}] 학급 데이터 동기화 시작...`);
   
-  fdb.collection("items").onSnapshot((snapshot) => {
-    console.log("✅ 비품 목록 수신 성공!");
-    db.items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-    if (db.items.length === 0) seedInitialData();
-    refreshCurrentUI();
-  });
+  // 1. 해당 학급의 비품 목록만 감시
+  const itemsUnsub = fdb.collection("items")
+    .where("classCode", "==", classCode)
+    .onSnapshot((snapshot) => {
+      db.items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      if (db.items.length === 0 && currentUser.role === 'teacher') seedInitialData(classCode);
+      refreshCurrentUI();
+    });
 
-  fdb.collection("history").onSnapshot((snapshot) => {
-    db.history = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
-    refreshCurrentUI();
-  });
+  // 2. 해당 학급의 대여 이력만 감시
+  const historyUnsub = fdb.collection("history")
+    .where("classCode", "==", classCode)
+    .onSnapshot((snapshot) => {
+      db.history = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      refreshCurrentUI();
+    });
+
+  activeListeners.push(itemsUnsub, historyUnsub);
 }
 
 function refreshCurrentUI() {
   const activePage = document.querySelector('.page.active').id;
   if (activePage === 'page-admin') {
-    const activeTab = document.querySelector('.tab-content.active').id.replace('tab-', '');
-    adminTab(activeTab);
+    const activeTab = document.querySelector('.tab-content.active')?.id.replace('tab-', '');
+    if (activeTab) adminTab(activeTab);
   } else if (activePage === 'page-student') {
-    const activeTab = document.querySelector('.student-tab-content.active').id.replace('stTab-', '');
-    studentTab(activeTab);
+    const activeTab = document.querySelector('.student-tab-content.active')?.id.replace('stTab-', '');
+    if (activeTab) studentTab(activeTab);
   }
 }
 
-async function seedInitialData() {
+async function seedInitialData(classCode) {
+  console.log("🌱 초기 데이터 생성 중...");
   const initialItems = [
-    { id:'ITEM-001', name:'가위', category:'문구', quantity:3, desc:'일반 가위', maxDays:3 },
-    { id:'ITEM-002', name:'자 (30cm)', category:'문구', quantity:5, desc:'플라스틱 30cm 자', maxDays:3 },
-    { id:'ITEM-003', name:'풀', category:'문구', quantity:4, desc:'딱풀', maxDays:3 },
-    { id:'ITEM-004', name:'국어 사전', category:'도서', quantity:2, desc:'초등 국어 사전', maxDays:7 },
-    { id:'ITEM-005', name:'계산기', category:'기타', quantity:6, desc:'일반 계산기', maxDays:1 },
-    { id:'ITEM-006', name:'색연필 세트', category:'문구', quantity:4, desc:'12색 색연필', maxDays:3 },
+    { id:'ITEM-001', name:'가위', category:'문구', quantity:3, desc:'일반 가위', maxDays:3, classCode },
+    { id:'ITEM-002', name:'자 (30cm)', category:'문구', quantity:5, desc:'플라스틱 30cm 자', maxDays:3, classCode },
+    { id:'ITEM-003', name:'풀', category:'문구', quantity:4, desc:'딱풀', maxDays:3, classCode },
   ];
   for (const item of initialItems) {
-    await fdb.collection("items").doc(item.id).set(item);
+    await fdb.collection("items").doc(`${classCode}-${item.id}`).set(item);
   }
 }
 
-// ===================== AUTH LOGIC (Firebase 연동) =====================
-function selectRole(role) {
-  selectedRole = role;
-  document.getElementById('roleTeacher').classList.toggle('active', role==='teacher');
-  document.getElementById('roleStudent').classList.toggle('active', role==='student');
-}
-
+// ===================== AUTH LOGIC =====================
 async function handleLogin(e) {
   e.preventDefault();
   const id = document.getElementById('loginId').value.trim();
@@ -77,23 +78,23 @@ async function handleLogin(e) {
   const err = document.getElementById('loginError');
 
   try {
-    // 1. 데이터베이스에서 아이디와 비밀번호가 일치하는 유저 찾기
     const userDoc = await fdb.collection("users").doc(id).get();
-    
     if (userDoc.exists) {
       const userData = userDoc.data();
-      if (userData.pw === pw && userData.role === selectedRole) {
+      if (userData.pw === pw) {
         err.classList.add('hidden');
         currentUser = { id, ...userData };
+        
+        // 로그인 성공 시 해당 학급 코드 데이터 동기화 시작
+        initRealtimeSync(userData.classCode);
+        
         if (userData.role === 'teacher') showAdmin();
         else showStudent();
         return;
       }
     }
-    // 일치하는 계정이 없거나 비번이 틀린 경우
     err.classList.remove('hidden');
   } catch (error) {
-    console.error("Login error:", error);
     alert("로그인 중 오류가 발생했습니다.");
   }
 }
@@ -101,29 +102,25 @@ async function handleLogin(e) {
 async function handleSignUp(e) {
   e.preventDefault();
   const role = document.getElementById('signupRole').value;
+  const classCode = document.getElementById('signupClassCode').value.trim();
   const id = document.getElementById('signupId').value.trim();
   const pw = document.getElementById('signupPw').value;
   const name = document.getElementById('signupName').value.trim();
-  const grade = document.getElementById('signupGrade').value.trim();
+
+  if (!classCode) { alert("학급 코드를 입력해 주세요."); return; }
 
   try {
-    // 아이디 중복 확인
     const checkDoc = await fdb.collection("users").doc(id).get();
-    if (checkDoc.exists) {
-      alert("이미 존재하는 아이디입니다.");
-      return;
-    }
+    if (checkDoc.exists) { alert("이미 존재하는 아이디입니다."); return; }
 
-    // 새 유저 저장
     await fdb.collection("users").doc(id).set({
-      role, pw, name, grade,
-      createdAt: now()
+      role, classCode, pw, name,
+      createdAt: new Date().toISOString()
     });
 
-    alert("회원가입이 완료되었습니다! 로그인해 주세요.");
+    alert(`회원가입 완료! 학급 코드 [${classCode}]로 로그인해 주세요.`);
     showPage('page-login');
   } catch (error) {
-    console.error("Signup error:", error);
     alert("회원가입 실패: " + error.message);
   }
 }
@@ -132,56 +129,45 @@ async function handleFindAuth(e) {
   e.preventDefault();
   const name = document.getElementById('findName').value.trim();
   const resultBox = document.getElementById('findResult');
-
   try {
     const snapshot = await fdb.collection("users").where("name", "==", name).get();
-    
-    if (snapshot.empty) {
-      resultBox.innerHTML = "해당 성명으로 가입된 정보를 찾을 수 없습니다.";
-    } else {
-      let html = "<strong>찾은 계정 정보:</strong><br>";
+    if (snapshot.empty) resultBox.innerHTML = "정보를 찾을 수 없습니다.";
+    else {
+      let html = "<strong>계정 정보:</strong><br>";
       snapshot.forEach(doc => {
-        const data = doc.data();
-        html += `ID: <b>${doc.id}</b> / PW: <b>${data.pw}</b> (${data.role === 'teacher' ? '교사' : '학생'})<br>`;
+        const d = doc.data();
+        html += `ID: <b>${doc.id}</b> / PW: <b>${d.pw}</b> (학급: ${d.classCode})<br>`;
       });
       resultBox.innerHTML = html;
     }
     resultBox.classList.remove('hidden');
-  } catch (error) {
-    alert("조회 중 오류가 발생했습니다.");
-  }
-}
-
-function toggleGradeField() {
-  const role = document.getElementById('signupRole').value;
-  document.getElementById('gradeField').style.display = (role === 'teacher') ? 'none' : 'block';
+  } catch (error) { alert("조회 오류"); }
 }
 
 function logout() {
-  stopScan();
+  activeListeners.forEach(unsub => unsub());
   currentUser = null;
   showPage('page-login');
-  document.getElementById('loginId').value = '';
-  document.getElementById('loginPw').value = '';
 }
 
-// ===================== NAVIGATION & RENDER (기존 로직 유지) =====================
+// ===================== NAVIGATION =====================
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 'page-signup') toggleGradeField();
 }
 
 function showAdmin() {
   document.getElementById('adminUserName').textContent = currentUser.name;
+  document.getElementById('adminClassBadge').textContent = currentUser.classCode;
   showPage('page-admin');
   adminTab('dashboard');
 }
 
 function showStudent() {
   document.getElementById('studentUserName').textContent = currentUser.name;
+  document.getElementById('studentClassBadge').textContent = currentUser.classCode;
   showPage('page-student');
-  studentTab('scan');
+  studentTab('catalog');
 }
 
 function adminTab(tab) {
@@ -204,25 +190,17 @@ function studentTab(tab) {
   else if (tab === 'catalog') renderCatalog();
 }
 
-// ===================== RENDER FUNCTIONS =====================
+// ===================== RENDER =====================
 function renderDashboard() {
   const total = db.items.length;
   const borrowed = db.history.filter(h => !h.returnedAt).length;
-  const available = total - borrowed;
-  const overdue = db.history.filter(h => {
-    if (h.returnedAt) return false;
-    const item = db.items.find(i => i.id === h.itemId);
-    return item && isOverdue(h.borrowedAt, item.maxDays);
-  }).length;
-
   document.getElementById('statTotalItems').textContent = total;
   document.getElementById('statBorrowed').textContent = borrowed;
-  document.getElementById('statAvailable').textContent = available;
-  document.getElementById('statOverdue').textContent = overdue;
-
+  document.getElementById('statAvailable').textContent = total - borrowed;
+  
   const activeLogs = db.history.filter(h => !h.returnedAt);
   const bl = document.getElementById('currentBorrowList');
-  if (!activeLogs.length) { bl.innerHTML = '<div class="empty-state">✅ 현재 대여 중인 비품이 없습니다</div>'; }
+  if (!activeLogs.length) bl.innerHTML = '<div class="empty-state">대여 중인 비품이 없습니다</div>';
   else {
     bl.innerHTML = activeLogs.map(h => {
       const item = db.items.find(i => i.id === h.itemId);
@@ -230,7 +208,7 @@ function renderDashboard() {
         <div class="borrow-item-avatar">${CATEGORY_EMOJI[item?.category]||'📦'}</div>
         <div class="borrow-item-info">
           <div class="borrow-item-name">${item?.name||h.itemId}</div>
-          <div class="borrow-item-sub">${h.studentName} · ${fmt(h.borrowedAt)}</div>
+          <div class="borrow-item-sub">${h.studentName}</div>
         </div></div>`;
     }).join('');
   }
@@ -242,12 +220,12 @@ function renderItems() {
   g.innerHTML = db.items.map(item => {
     const st = getItemStatus(item);
     const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
-    const imageHtml = item.imgData 
-      ? `<div class="item-image"><img src="${item.imgData}" alt="${item.name}"></div>`
+    const imgHtml = item.imgData 
+      ? `<div class="item-image"><img src="${item.imgData}"></div>`
       : `<div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>`;
 
     return `<div class="item-card ${st.status==='available'?'':'unavailable'}">
-      ${imageHtml}
+      ${imgHtml}
       <div class="item-card-name">${item.name}</div>
       <div class="item-card-cat">${item.category}</div>
       <div class="item-status-badge status-${st.css}">${st.label}${active ? ' · '+active.studentName : ''}</div>
@@ -266,44 +244,40 @@ function renderCatalog() {
   g.innerHTML = db.items.map(item => {
     const st = getItemStatus(item);
     const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
-    const imageHtml = item.imgData 
-      ? `<div class="item-image"><img src="${item.imgData}" alt="${item.name}"></div>`
+    const imgHtml = item.imgData 
+      ? `<div class="item-image"><img src="${item.imgData}"></div>`
       : `<div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>`;
 
     return `<div class="item-card ${st.status==='available'?'':'unavailable'}" onclick="processQR('${item.id}')">
-      ${imageHtml}
+      ${imgHtml}
       <div class="item-card-name">${item.name}</div>
       <div class="item-card-cat">${item.category} · 최대 ${item.maxDays}일</div>
-      <div class="item-status-badge status-${st.css}">${st.label}</div>
-      <div class="item-meta">클릭하여 대여/반납하기</div>
+      <div class="item-status-badge status-${st.css}">${st.label}${active && active.studentId === currentUser.id ? ' (내가 대여 중)' : ''}</div>
     </div>`;
   }).join('');
 }
 
 function renderHistory() {
   const body = document.getElementById('historyBody');
-  let list = [...db.history].sort((a,b) => new Date(b.borrowedAt)-new Date(a.borrowedAt));
-  body.innerHTML = list.map((h, i) => {
+  body.innerHTML = [...db.history].sort((a,b) => new Date(b.borrowedAt)-new Date(a.borrowedAt)).map((h, i) => {
     const item = db.items.find(it => it.id === h.itemId);
     return `<tr>
       <td>${i+1}</td><td>${h.studentName}</td><td>${item?.name||h.itemId}</td>
-      <td>${fmt(h.borrowedAt)}</td><td>${fmt(h.returnedAt)}</td>
-      <td>${h.returnedAt ? '반납완료' : '대여중'}</td>
+      <td>${fmt(h.borrowedAt)}</td><td>${h.returnedAt ? '반납완료' : '대여중'}</td>
     </tr>`;
   }).join('');
 }
 
 function renderStudents() {
   const list = document.getElementById('studentsList');
-  fdb.collection("users").where("role", "==", "student").get().then(snapshot => {
-    list.innerHTML = snapshot.docs.map(doc => {
+  fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").get().then(snap => {
+    list.innerHTML = snap.docs.map(doc => {
       const s = doc.data();
-      const activeCount = db.history.filter(h => h.studentId === doc.id && !h.returnedAt).length;
+      const count = db.history.filter(h => h.studentId === doc.id && !h.returnedAt).length;
       return `<div class="student-card">
         <div class="student-avatar">🎒</div>
         <div class="student-name">${s.name}</div>
-        <div class="student-id">${s.grade||'학년정보 없음'}</div>
-        <div class="student-id">현재 대여 중: ${activeCount}건</div>
+        <div class="student-id">현재 대여: ${count}건</div>
       </div>`;
     }).join('');
   });
@@ -324,32 +298,7 @@ function renderMyBorrow() {
   }).join('');
 }
 
-// ===================== IMAGE HANDLING =====================
-function previewImage(input) {
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      document.getElementById('imagePreview').innerHTML = `<img src="${e.target.result}" />`;
-      document.getElementById('itemImageData').value = e.target.result;
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
-}
-
-function clearImagePreview() {
-  document.getElementById('imagePreview').innerHTML = '<span>📷 사진 선택 (선택 사항)</span>';
-  document.getElementById('itemImageData').value = '';
-  document.getElementById('itemImageInput').value = '';
-}
-
-// ===================== QR & MODAL UTILS =====================
-function generateAllQRs() {
-  document.querySelectorAll('img[data-qr-id]').forEach(img => {
-    const id = img.getAttribute('data-qr-id');
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(id)}&size=120x120`;
-  });
-}
-
+// ===================== QR & MODALS =====================
 function showQR(itemId) {
   const item = db.items.find(i => i.id === itemId);
   if (!item) return;
@@ -362,14 +311,24 @@ function showQR(itemId) {
 
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
+
+function previewImage(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('imagePreview').innerHTML = `<img src="${e.target.result}" />`;
+      document.getElementById('itemImageData').value = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
 
 function openAddItemModal() {
   document.getElementById('modalItemTitle').textContent = '비품 추가';
   document.getElementById('editItemId').value = '';
   document.getElementById('itemName').value = '';
-  document.getElementById('itemDesc').value = '';
-  clearImagePreview();
+  document.getElementById('itemImageData').value = '';
+  document.getElementById('imagePreview').innerHTML = '<span>📷 사진 선택</span>';
   openModal('modal-item');
 }
 
@@ -379,16 +338,9 @@ function openEditItem(id) {
   document.getElementById('editItemId').value = id;
   document.getElementById('itemName').value = item.name;
   document.getElementById('itemCategory').value = item.category;
-  document.getElementById('itemQuantity').value = item.quantity;
-  document.getElementById('itemDesc').value = item.desc || '';
   document.getElementById('itemMaxDays').value = item.maxDays;
-  
-  if (item.imgData) {
-    document.getElementById('imagePreview').innerHTML = `<img src="${item.imgData}" />`;
-    document.getElementById('itemImageData').value = item.imgData;
-  } else {
-    clearImagePreview();
-  }
+  document.getElementById('itemImageData').value = item.imgData || '';
+  document.getElementById('imagePreview').innerHTML = item.imgData ? `<img src="${item.imgData}">` : '<span>📷 사진 선택</span>';
   openModal('modal-item');
 }
 
@@ -398,67 +350,50 @@ async function saveItem(e) {
   const data = {
     name: document.getElementById('itemName').value.trim(),
     category: document.getElementById('itemCategory').value,
-    quantity: parseInt(document.getElementById('itemQuantity').value)||1,
-    desc: document.getElementById('itemDesc').value.trim(),
     maxDays: parseInt(document.getElementById('itemMaxDays').value)||7,
-    imgData: document.getElementById('itemImageData').value
+    imgData: document.getElementById('itemImageData').value,
+    classCode: currentUser.classCode // 학급 코드 포함 저장
   };
   if (editId) await fdb.collection("items").doc(editId).update(data);
-  else {
-    const newId = genId();
-    await fdb.collection("items").doc(newId).set({ id: newId, ...data });
-  }
+  else await fdb.collection("items").add({ id: 'ITEM-'+Date.now(), ...data });
   closeModal('modal-item');
 }
 
 async function deleteItem(id) {
-  if (!confirm('삭제하시겠습니까?')) return;
-  await fdb.collection("items").doc(id).delete();
+  if (confirm('삭제하시겠습니까?')) await fdb.collection("items").doc(id).delete();
 }
 
-function processQR(itemId) { 
+function processQR(itemId) {
   const item = db.items.find(i => i.id === itemId);
   if (!item) return;
-  pendingBorrowItemId = itemId;
   document.getElementById('borrowItemName').textContent = item.name;
+  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
+  document.getElementById('borrowConfirmMsg').textContent = active ? '이 비품을 반납하시겠습니까?' : '이 비품을 대여하시겠습니까?';
   openModal('modal-borrow');
+  window.pendingItemId = itemId;
 }
 
 async function confirmBorrow() {
-  if (!pendingBorrowItemId) return;
-  const itemId = pendingBorrowItemId;
+  const itemId = window.pendingItemId;
   const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
-  if (active) await fdb.collection("history").doc(active.firestoreId).update({ returnedAt: now() });
-  else {
+  if (active) {
+    await fdb.collection("history").doc(active.firestoreId).update({ returnedAt: new Date().toISOString() });
+  } else {
     await fdb.collection("history").add({
-      itemId, studentId: currentUser.id, studentName: currentUser.name, borrowedAt: now(), returnedAt: null
+      itemId, studentId: currentUser.id, studentName: currentUser.name, 
+      borrowedAt: new Date().toISOString(), returnedAt: null, 
+      classCode: currentUser.classCode // 학급 코드 포함 저장
     });
   }
   closeModal('modal-borrow');
-  pendingBorrowItemId = null;
 }
 
-// ===================== OTHER UTILS =====================
-function genId() { return 'ITEM-' + Math.floor(Math.random() * 1000000); }
-function now() { return new Date().toISOString(); }
-function fmt(iso) {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-function isOverdue(borrowedAt, maxDays) {
-  if (!borrowedAt || !maxDays) return false;
-  return (Date.now() - new Date(borrowedAt)) > maxDays * 86400000;
-}
+// ===================== UTILS =====================
+function fmt(iso) { return iso ? iso.split('T')[0].replace(/-/g,'.') : '-'; }
 function getItemStatus(item) {
   const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
   if (!active) return { status:'available', label:'대여 가능', css:'available' };
-  if (isOverdue(active.borrowedAt, item.maxDays)) return { status:'overdue', label:'연체 중', css:'overdue' };
   return { status:'borrowed', label:'대여 중', css:'borrowed' };
 }
 
-// ===================== INIT =====================
-document.addEventListener('DOMContentLoaded', () => {
-  initRealtimeSync();
-  showPage('page-login');
-});
+document.addEventListener('DOMContentLoaded', () => { showPage('page-login'); });
