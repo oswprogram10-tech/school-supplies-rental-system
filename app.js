@@ -1,12 +1,12 @@
 // ===================== FIREBASE CONFIG =====================
 // [주의] 아래 내용을 본인의 Firebase 콘솔에서 복사한 내용으로 반드시 교체하세요!
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCLcvn0LL6I1pWnJ54Pi5Z3mHMzkerd_TM",
+  authDomain: "school-supplies-rental-system.firebaseapp.com",
+  projectId: "school-supplies-rental-system",
+  storageBucket: "school-supplies-rental-system.firebasestorage.app",
+  messagingSenderId: "212323277172",
+  appId: "1:212323277172:web:6828275c6779c54f2cb421"
 };
 
 // Firebase 초기화
@@ -15,13 +15,13 @@ const fdb = firebase.firestore();
 
 // ===================== DATA & ACCOUNTS =====================
 const ACCOUNTS = {
-  teacher: { id:'teacher', pw:'teacher123', role:'teacher', name:'선생님' },
-  student1: { id:'student1', pw:'pass1234', role:'student', name:'김민준', grade:'3학년 2반' },
-  student2: { id:'student2', pw:'pass1234', role:'student', name:'이서연', grade:'3학년 2반' },
-  student3: { id:'student3', pw:'pass1234', role:'student', name:'박지호', grade:'3학년 2반' },
+  teacher: { id: 'teacher', pw: 'teacher123', role: 'teacher', name: '선생님' },
+  student1: { id: 'student1', pw: 'pass1234', role: 'student', name: '김민준', grade: '3학년 2반' },
+  student2: { id: 'student2', pw: 'pass1234', role: 'student', name: '이서연', grade: '3학년 2반' },
+  student3: { id: 'student3', pw: 'pass1234', role: 'student', name: '박지호', grade: '3학년 2반' },
 };
 
-const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','기타':'📦' };
+const CATEGORY_EMOJI = { '문구': '✏️', '도서': '📖', '실험도구': '🔬', '체육용품': '⚽', '기타': '📦' };
 
 // 전역 상태 (Firebase 리스너에 의해 실시간 업데이트됨)
 let db = { items: [], history: [], nextItemId: 100 };
@@ -60,12 +60,12 @@ function refreshCurrentUI() {
 // 최초 데이터가 없을 때 기본 비품 등록
 async function seedInitialData() {
   const initialItems = [
-    { id:'ITEM-001', name:'가위', category:'문구', quantity:3, desc:'일반 가위', maxDays:3 },
-    { id:'ITEM-002', name:'자 (30cm)', category:'문구', quantity:5, desc:'플라스틱 30cm 자', maxDays:3 },
-    { id:'ITEM-003', name:'풀', category:'문구', quantity:4, desc:'딱풀', maxDays:3 },
-    { id:'ITEM-004', name:'국어 사전', category:'도서', quantity:2, desc:'초등 국어 사전', maxDays:7 },
-    { id:'ITEM-005', name:'계산기', category:'기타', quantity:6, desc:'일반 계산기', maxDays:1 },
-    { id:'ITEM-006', name:'색연필 세트', category:'문구', quantity:4, desc:'12색 색연필', maxDays:3 },
+    { id: 'ITEM-001', name: '가위', category: '문구', quantity: 3, desc: '일반 가위', maxDays: 3 },
+    { id: 'ITEM-002', name: '자 (30cm)', category: '문구', quantity: 5, desc: '플라스틱 30cm 자', maxDays: 3 },
+    { id: 'ITEM-003', name: '풀', category: '문구', quantity: 4, desc: '딱풀', maxDays: 3 },
+    { id: 'ITEM-004', name: '국어 사전', category: '도서', quantity: 2, desc: '초등 국어 사전', maxDays: 7 },
+    { id: 'ITEM-005', name: '계산기', category: '기타', quantity: 6, desc: '일반 계산기', maxDays: 1 },
+    { id: 'ITEM-006', name: '색연필 세트', category: '문구', quantity: 4, desc: '12색 색연필', maxDays: 3 },
   ];
   for (const item of initialItems) {
     await fdb.collection("items").doc(item.id).set(item);
@@ -78,7 +78,7 @@ function now() { return new Date().toISOString(); }
 function fmt(iso) {
   if (!iso) return '-';
   const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 function isOverdue(borrowedAt, maxDays) {
   if (!borrowedAt || !maxDays) return false;
@@ -86,16 +86,16 @@ function isOverdue(borrowedAt, maxDays) {
 }
 function getItemStatus(item) {
   const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
-  if (!active) return { status:'available', label:'대여 가능', css:'available' };
-  if (isOverdue(active.borrowedAt, item.maxDays)) return { status:'overdue', label:'연체 중', css:'overdue' };
-  return { status:'borrowed', label:'대여 중', css:'borrowed' };
+  if (!active) return { status: 'available', label: '대여 가능', css: 'available' };
+  if (isOverdue(active.borrowedAt, item.maxDays)) return { status: 'overdue', label: '연체 중', css: 'overdue' };
+  return { status: 'borrowed', label: '대여 중', css: 'borrowed' };
 }
 
 // ===================== AUTH =====================
 function selectRole(role) {
   selectedRole = role;
-  document.getElementById('roleTeacher').classList.toggle('active', role==='teacher');
-  document.getElementById('roleStudent').classList.toggle('active', role==='student');
+  document.getElementById('roleTeacher').classList.toggle('active', role === 'teacher');
+  document.getElementById('roleStudent').classList.toggle('active', role === 'student');
 }
 
 function handleLogin(e) {
@@ -181,15 +181,15 @@ function renderDashboard() {
       const item = db.items.find(i => i.id === h.itemId);
       const od = item && isOverdue(h.borrowedAt, item.maxDays);
       return `<div class="borrow-item">
-        <div class="borrow-item-avatar">${CATEGORY_EMOJI[item?.category]||'📦'}</div>
+        <div class="borrow-item-avatar">${CATEGORY_EMOJI[item?.category] || '📦'}</div>
         <div class="borrow-item-info">
-          <div class="borrow-item-name">${item?.name||h.itemId} ${od?'<span class="overdue-tag">연체</span>':''}</div>
+          <div class="borrow-item-name">${item?.name || h.itemId} ${od ? '<span class="overdue-tag">연체</span>' : ''}</div>
           <div class="borrow-item-sub">${h.studentName} · ${fmt(h.borrowedAt)}</div>
         </div></div>`;
     }).join('');
   }
 
-  const recent = [...db.history].sort((a,b) => new Date(b.borrowedAt)-new Date(a.borrowedAt)).slice(0,8);
+  const recent = [...db.history].sort((a, b) => new Date(b.borrowedAt) - new Date(a.borrowedAt)).slice(0, 8);
   const al = document.getElementById('recentActivityList');
   if (!recent.length) { al.innerHTML = '<div class="empty-state">📋 대여 이력이 없습니다</div>'; }
   else {
@@ -198,10 +198,10 @@ function renderDashboard() {
       const action = h.returnedAt ? '반납' : '대여';
       const actionTime = h.returnedAt ? h.returnedAt : h.borrowedAt;
       return `<div class="activity-item">
-        <div class="activity-avatar">${h.returnedAt?'↩️':'📤'}</div>
+        <div class="activity-avatar">${h.returnedAt ? '↩️' : '📤'}</div>
         <div class="borrow-item-info">
           <div class="borrow-item-name">${h.studentName} · ${action}</div>
-          <div class="borrow-item-sub">${item?.name||h.itemId} · ${fmt(actionTime)}</div>
+          <div class="borrow-item-sub">${item?.name || h.itemId} · ${fmt(actionTime)}</div>
         </div></div>`;
     }).join('');
   }
@@ -214,14 +214,14 @@ function renderItems() {
   g.innerHTML = db.items.map(item => {
     const st = getItemStatus(item);
     const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
-    return `<div class="item-card ${st.status==='available'?'':'unavailable'}">
-      <div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>
+    return `<div class="item-card ${st.status === 'available' ? '' : 'unavailable'}">
+      <div class="item-emoji">${CATEGORY_EMOJI[item.category] || '📦'}</div>
       <div class="item-qr-preview" onclick="event.stopPropagation(); showQR('${item.id}')">
         <img data-qr-id="${item.id}" alt="QR" />
       </div>
       <div class="item-card-name">${item.name}</div>
       <div class="item-card-cat">${item.category} · ${item.maxDays}일</div>
-      <div class="item-status-badge status-${st.css}">${st.label}${active ? ' · '+active.studentName : ''}</div>
+      <div class="item-status-badge status-${st.css}">${st.label}${active ? ' · ' + active.studentName : ''}</div>
       <div class="item-card-actions">
         <button class="btn-icon" onclick="openEditItem('${item.id}')">✏️ 수정</button>
         <button class="btn-danger" onclick="deleteItem('${item.id}')">🗑️ 삭제</button>
@@ -237,11 +237,11 @@ async function saveItem(e) {
   const data = {
     name: document.getElementById('itemName').value.trim(),
     category: document.getElementById('itemCategory').value,
-    quantity: parseInt(document.getElementById('itemQuantity').value)||1,
+    quantity: parseInt(document.getElementById('itemQuantity').value) || 1,
     desc: document.getElementById('itemDesc').value.trim(),
-    maxDays: parseInt(document.getElementById('itemMaxDays').value)||7,
+    maxDays: parseInt(document.getElementById('itemMaxDays').value) || 7,
   };
-  
+
   if (editId) {
     await fdb.collection("items").doc(editId).update(data);
   } else {
@@ -279,11 +279,11 @@ function showQR(itemId) {
 // ===================== ADMIN: HISTORY =====================
 function renderHistory() {
   const body = document.getElementById('historyBody');
-  let list = [...db.history].sort((a,b) => new Date(b.borrowedAt)-new Date(a.borrowedAt));
+  let list = [...db.history].sort((a, b) => new Date(b.borrowedAt) - new Date(a.borrowedAt));
   body.innerHTML = list.map((h, i) => {
     const item = db.items.find(it => it.id === h.itemId);
     return `<tr>
-      <td>${i+1}</td><td>${h.studentName}</td><td>${item?.name||h.itemId}</td>
+      <td>${i + 1}</td><td>${h.studentName}</td><td>${item?.name || h.itemId}</td>
       <td>${fmt(h.borrowedAt)}</td><td>${fmt(h.returnedAt)}</td>
       <td>${h.returnedAt ? '반납완료' : '대여중'}</td>
     </tr>`;
@@ -295,7 +295,7 @@ async function confirmBorrow() {
   if (!pendingBorrowItemId) return;
   const itemId = pendingBorrowItemId;
   const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
-  
+
   if (active) {
     // 반납 처리
     await fdb.collection("history").doc(active.firestoreId).update({ returnedAt: now() });
@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function renderStudents() { /* ... */ }
 function startScan() { /* ... */ }
 function stopScan() { /* ... */ }
-function processQR(itemId) { 
+function processQR(itemId) {
   const item = db.items.find(i => i.id === itemId);
   if (!item) return;
   pendingBorrowItemId = itemId;
