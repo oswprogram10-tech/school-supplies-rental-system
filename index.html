@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>교실 비품 대여 시스템</title>
+  <meta name="description" content="QR코드를 이용한 학교 교실 비품 대여 관리 시스템. 교사와 학생 모두를 위한 스마트 비품 관리 솔루션." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===================== LOGIN PAGE ===================== -->
+<div id="page-login" class="page active">
+  <div class="login-bg">
+    <div class="login-orb orb1"></div>
+    <div class="login-orb orb2"></div>
+    <div class="login-orb orb3"></div>
+  </div>
+  <div class="login-container">
+    <div class="login-header">
+      <div class="logo-icon">📚</div>
+      <h1 class="login-title">교실 비품 대여</h1>
+      <p class="login-subtitle">QR코드로 간편하게 비품을 빌리고 반납하세요</p>
+    </div>
+    <div class="role-selector">
+      <button class="role-btn active" id="roleTeacher" onclick="selectRole('teacher')">
+        <span class="role-icon">👩‍🏫</span>
+        <span class="role-label">교사 (관리자)</span>
+      </button>
+      <button class="role-btn" id="roleStudent" onclick="selectRole('student')">
+        <span class="role-icon">🎒</span>
+        <span class="role-label">학생</span>
+      </button>
+    </div>
+    <form class="login-form" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="loginId">아이디</label>
+        <input type="text" id="loginId" placeholder="아이디를 입력하세요" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label for="loginPw">비밀번호</label>
+        <input type="password" id="loginPw" placeholder="비밀번호를 입력하세요" required autocomplete="current-password" />
+      </div>
+      <div id="loginError" class="login-error hidden">아이디 또는 비밀번호가 올바르지 않습니다.</div>
+      <button type="submit" class="btn-primary login-btn">로그인</button>
+    </form>
+    <div class="login-hint">
+      <details>
+        <summary>🔑 테스트 계정 보기</summary>
+        <div class="hint-content">
+          <div class="hint-row"><b>교사:</b> teacher / teacher123</div>
+          <div class="hint-row"><b>학생:</b> student1 / pass1234 (김민준)</div>
+          <div class="hint-row"><b>학생:</b> student2 / pass1234 (이서연)</div>
+          <div class="hint-row"><b>학생:</b> student3 / pass1234 (박지호)</div>
+        </div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ADMIN PAGE ===================== -->
+<div id="page-admin" class="page">
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="nav-logo">📚</span>
+      <span class="nav-title">교실 비품 관리</span>
+      <span class="nav-badge admin-badge">관리자</span>
+    </div>
+    <div class="nav-right">
+      <span class="nav-user" id="adminUserName"></span>
+      <button class="btn-logout" onclick="logout()">로그아웃</button>
+    </div>
+  </nav>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <button class="sidebar-btn active" id="sideBtn-dashboard" onclick="adminTab('dashboard')">
+        <span>📊</span> 대시보드
+      </button>
+      <button class="sidebar-btn" id="sideBtn-items" onclick="adminTab('items')">
+        <span>📦</span> 비품 관리
+      </button>
+      <button class="sidebar-btn" id="sideBtn-history" onclick="adminTab('history')">
+        <span>📋</span> 대여 이력
+      </button>
+      <button class="sidebar-btn" id="sideBtn-students" onclick="adminTab('students')">
+        <span>👥</span> 학생 현황
+      </button>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <!-- Dashboard Tab -->
+      <div id="tab-dashboard" class="tab-content active">
+        <div class="page-header">
+          <h2>📊 대시보드</h2>
+          <p class="page-desc">비품 대여 현황을 한 눈에 확인하세요</p>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card" style="--accent:#6366f1">
+            <div class="stat-icon">📦</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statTotalItems">0</div>
+              <div class="stat-label">총 비품 수</div>
+            </div>
+          </div>
+          <div class="stat-card" style="--accent:#f59e0b">
+            <div class="stat-icon">🔄</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statBorrowed">0</div>
+              <div class="stat-label">대여 중</div>
+            </div>
+          </div>
+          <div class="stat-card" style="--accent:#10b981">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statAvailable">0</div>
+              <div class="stat-label">대여 가능</div>
+            </div>
+          </div>
+          <div class="stat-card" style="--accent:#ef4444">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statOverdue">0</div>
+              <div class="stat-label">연체 중</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="card">
+            <div class="card-header">
+              <h3>🔄 현재 대여 중인 비품</h3>
+            </div>
+            <div id="currentBorrowList" class="borrow-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>📈 최근 대여 활동</h3>
+            </div>
+            <div id="recentActivityList" class="activity-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Items Tab -->
+      <div id="tab-items" class="tab-content">
+        <div class="page-header">
+          <h2>📦 비품 관리</h2>
+          <button class="btn-primary" onclick="openAddItemModal()">+ 비품 추가</button>
+        </div>
+        <div class="items-grid" id="itemsGrid"></div>
+      </div>
+
+      <!-- History Tab -->
+      <div id="tab-history" class="tab-content">
+        <div class="page-header">
+          <h2>📋 대여 이력</h2>
+          <div class="filter-row">
+            <input type="text" id="historySearch" placeholder="학생명 또는 비품명 검색..." oninput="renderHistory()" />
+            <select id="historyFilter" onchange="renderHistory()">
+              <option value="all">전체</option>
+              <option value="borrowed">대여 중</option>
+              <option value="returned">반납 완료</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="historyTable">
+            <thead>
+              <tr>
+                <th>번호</th>
+                <th>학생명</th>
+                <th>비품명</th>
+                <th>대여 일시</th>
+                <th>반납 일시</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Students Tab -->
+      <div id="tab-students" class="tab-content">
+        <div class="page-header">
+          <h2>👥 학생 현황</h2>
+        </div>
+        <div id="studentsList" class="students-grid"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ===================== STUDENT PAGE ===================== -->
+<div id="page-student" class="page">
+  <nav class="navbar student-nav">
+    <div class="nav-brand">
+      <span class="nav-logo">📚</span>
+      <span class="nav-title">비품 대여</span>
+      <span class="nav-badge student-badge">학생</span>
+    </div>
+    <div class="nav-right">
+      <span class="nav-user" id="studentUserName"></span>
+      <button class="btn-logout" onclick="logout()">로그아웃</button>
+    </div>
+  </nav>
+
+  <div class="student-layout">
+    <div class="student-tabs">
+      <button class="student-tab-btn active" id="stBtn-scan" onclick="studentTab('scan')">📷 QR 스캔</button>
+      <button class="student-tab-btn" id="stBtn-myborrow" onclick="studentTab('myborrow')">📋 내 대여 목록</button>
+      <button class="student-tab-btn" id="stBtn-catalog" onclick="studentTab('catalog')">📦 비품 목록</button>
+    </div>
+
+    <!-- QR Scan Tab -->
+    <div id="stTab-scan" class="student-tab-content active">
+      <div class="scan-container">
+        <div class="scan-header">
+          <h2>QR코드 스캔</h2>
+          <p>비품에 부착된 QR코드를 스캔하여 대여 또는 반납하세요</p>
+        </div>
+        <div class="scan-area">
+          <div id="qr-reader" class="qr-reader-box"></div>
+          <div id="scan-result" class="scan-result hidden"></div>
+        </div>
+        <div class="scan-actions">
+          <button class="btn-primary" id="startScanBtn" onclick="startScan()">📷 카메라 스캔 시작</button>
+          <button class="btn-secondary hidden" id="stopScanBtn" onclick="stopScan()">⏹ 스캔 중지</button>
+          <div class="manual-input-wrap">
+            <p class="or-divider">— 또는 —</p>
+            <div class="manual-row">
+              <input type="text" id="manualQrInput" placeholder="비품 ID를 직접 입력하세요 (예: ITEM-001)" />
+              <button class="btn-secondary" onclick="manualScan()">확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- My Borrow Tab -->
+    <div id="stTab-myborrow" class="student-tab-content">
+      <div class="page-header">
+        <h2>📋 내 대여 목록</h2>
+      </div>
+      <div id="myBorrowList" class="my-borrow-list"></div>
+    </div>
+
+    <!-- Catalog Tab -->
+    <div id="stTab-catalog" class="student-tab-content">
+      <div class="page-header">
+        <h2>📦 비품 목록</h2>
+        <p class="page-desc">현재 대여 가능한 비품을 확인하세요</p>
+      </div>
+      <div id="catalogGrid" class="items-grid catalog-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODALS ===================== -->
+
+<!-- Add/Edit Item Modal -->
+<div id="modal-item" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-item')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalItemTitle">비품 추가</h3>
+      <button class="modal-close" onclick="closeModal('modal-item')">✕</button>
+    </div>
+    <form onsubmit="saveItem(event)" class="modal-form">
+      <div class="form-group">
+        <label>비품명 <span class="required">*</span></label>
+        <input type="text" id="itemName" placeholder="예: 가위, 자, 풀" required />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>카테고리</label>
+          <select id="itemCategory">
+            <option value="문구">✏️ 문구</option>
+            <option value="도서">📖 도서</option>
+            <option value="실험도구">🔬 실험도구</option>
+            <option value="체육용품">⚽ 체육용품</option>
+            <option value="기타">📦 기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>수량</label>
+          <input type="number" id="itemQuantity" min="1" value="1" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>설명</label>
+        <textarea id="itemDesc" placeholder="비품에 대한 설명을 입력하세요" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label>최대 대여 기간 (일)</label>
+        <input type="number" id="itemMaxDays" min="1" value="7" />
+      </div>
+      <input type="hidden" id="editItemId" />
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeModal('modal-item')">취소</button>
+        <button type="submit" class="btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- QR Code Modal -->
+<div id="modal-qr" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-qr')">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>QR코드</h3>
+      <button class="modal-close" onclick="closeModal('modal-qr')">✕</button>
+    </div>
+    <div class="qr-modal-content">
+      <div id="qrCodeCanvas" class="qr-display"></div>
+      <div id="qrItemName" class="qr-item-name"></div>
+      <div id="qrItemId" class="qr-item-id"></div>
+      <button class="btn-primary" onclick="printQR()">🖨️ QR코드 인쇄</button>
+    </div>
+  </div>
+</div>
+
+<!-- Borrow Confirm Modal -->
+<div id="modal-borrow" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-borrow')">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 id="borrowModalTitle">비품 대여</h3>
+      <button class="modal-close" onclick="closeModal('modal-borrow')">✕</button>
+    </div>
+    <div class="borrow-modal-content">
+      <div class="borrow-item-info">
+        <div class="borrow-item-icon" id="borrowItemIcon">📦</div>
+        <div class="borrow-item-name" id="borrowItemName"></div>
+        <div class="borrow-item-status" id="borrowItemStatus"></div>
+      </div>
+      <p id="borrowConfirmMsg"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('modal-borrow')">취소</button>
+        <button class="btn-primary" id="borrowConfirmBtn" onclick="confirmBorrow()">확인</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
