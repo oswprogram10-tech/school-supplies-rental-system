@@ -355,13 +355,15 @@
         </div>
       </div>
       <div class="form-group">
-        <label>설명</label>
-        <textarea id="itemDesc" placeholder="비품에 대한 설명을 입력하세요" rows="2"></textarea>
+        <label>비품 사진</label>
+        <div class="image-upload-wrap">
+          <input type="file" id="itemImageInput" accept="image/*" onchange="previewImage(this)" />
+          <div id="imagePreview" class="image-preview-box">
+            <span>📷 사진 선택 (선택 사항)</span>
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label>최대 대여 기간 (일)</label>
-        <input type="number" id="itemMaxDays" min="1" value="7" />
-      </div>
+      <input type="hidden" id="itemImageData" />
       <input type="hidden" id="editItemId" />
       <div class="modal-actions">
         <button type="button" class="btn-secondary" onclick="closeModal('modal-item')">취소</button>

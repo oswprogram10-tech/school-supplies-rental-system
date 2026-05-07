@@ -242,8 +242,12 @@ function renderItems() {
   g.innerHTML = db.items.map(item => {
     const st = getItemStatus(item);
     const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
+    const imageHtml = item.imgData 
+      ? `<div class="item-image"><img src="${item.imgData}" alt="${item.name}"></div>`
+      : `<div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>`;
+
     return `<div class="item-card ${st.status==='available'?'':'unavailable'}">
-      <div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>
+      ${imageHtml}
       <div class="item-qr-preview" onclick="showQR('${item.id}')">
         <img data-qr-id="${item.id}" alt="QR" />
       </div>
@@ -265,8 +269,12 @@ function renderCatalog() {
   g.innerHTML = db.items.map(item => {
     const st = getItemStatus(item);
     const active = db.history.find(h => h.itemId === item.id && !h.returnedAt);
+    const imageHtml = item.imgData 
+      ? `<div class="item-image"><img src="${item.imgData}" alt="${item.name}"></div>`
+      : `<div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>`;
+
     return `<div class="item-card ${st.status==='available'?'':'unavailable'}" onclick="processQR('${item.id}')">
-      <div class="item-emoji">${CATEGORY_EMOJI[item.category]||'📦'}</div>
+      ${imageHtml}
       <div class="item-card-name">${item.name}</div>
       <div class="item-card-cat">${item.category} · 최대 ${item.maxDays}일</div>
       <div class="item-status-badge status-${st.css}">${st.label}</div>
@@ -318,6 +326,24 @@ function renderMyBorrow() {
   }).join('');
 }
 
+// ===================== IMAGE HANDLING =====================
+function previewImage(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('imagePreview').innerHTML = `<img src="${e.target.result}" />`;
+      document.getElementById('itemImageData').value = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function clearImagePreview() {
+  document.getElementById('imagePreview').innerHTML = '<span>📷 사진 선택 (선택 사항)</span>';
+  document.getElementById('itemImageData').value = '';
+  document.getElementById('itemImageInput').value = '';
+}
+
 // ===================== QR & MODAL UTILS =====================
 function generateAllQRs() {
   document.querySelectorAll('img[data-qr-id]').forEach(img => {
@@ -344,14 +370,27 @@ function openAddItemModal() {
   document.getElementById('modalItemTitle').textContent = '비품 추가';
   document.getElementById('editItemId').value = '';
   document.getElementById('itemName').value = '';
+  document.getElementById('itemDesc').value = '';
+  clearImagePreview();
   openModal('modal-item');
 }
 
 function openEditItem(id) {
   const item = db.items.find(i => i.id === id);
   document.getElementById('modalItemTitle').textContent = '비품 수정';
-  document.getElementById('itemName').value = item.name;
   document.getElementById('editItemId').value = id;
+  document.getElementById('itemName').value = item.name;
+  document.getElementById('itemCategory').value = item.category;
+  document.getElementById('itemQuantity').value = item.quantity;
+  document.getElementById('itemDesc').value = item.desc || '';
+  document.getElementById('itemMaxDays').value = item.maxDays;
+  
+  if (item.imgData) {
+    document.getElementById('imagePreview').innerHTML = `<img src="${item.imgData}" />`;
+    document.getElementById('itemImageData').value = item.imgData;
+  } else {
+    clearImagePreview();
+  }
   openModal('modal-item');
 }
 
@@ -364,6 +403,7 @@ async function saveItem(e) {
     quantity: parseInt(document.getElementById('itemQuantity').value)||1,
     desc: document.getElementById('itemDesc').value.trim(),
     maxDays: parseInt(document.getElementById('itemMaxDays').value)||7,
+    imgData: document.getElementById('itemImageData').value
   };
   if (editId) await fdb.collection("items").doc(editId).update(data);
   else {
