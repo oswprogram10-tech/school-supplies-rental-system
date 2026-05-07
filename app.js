@@ -170,9 +170,9 @@ function refreshCurrentUI() {
 
 async function seedInitialData(classCode) {
   const items = [
-    { id:'ITEM-1', name:'가위', category:'문구', maxDays:3, classCode, imgData:'' },
-    { id:'ITEM-2', name:'자', category:'문구', maxDays:3, classCode, imgData:'' },
-    { id:'ITEM-3', name:'풀', category:'문구', maxDays:3, classCode, imgData:'' }
+    { id:'ITEM-1', name:'가위', category:'문구', maxDays:3, totalQuantity: 5, classCode, imgData:'' },
+    { id:'ITEM-2', name:'자', category:'문구', maxDays:3, totalQuantity: 10, classCode, imgData:'' },
+    { id:'ITEM-3', name:'풀', category:'문구', maxDays:3, totalQuantity: 8, classCode, imgData:'' }
   ];
   for (const it of items) await fdb.collection("items").doc(`${classCode}-${it.id}`).set(it);
 }
@@ -222,11 +222,10 @@ function renderItems() {
   const g = document.getElementById('itemsGrid');
   g.innerHTML = db.items.map(it => {
     const st = getItemStatus(it);
-    const active = db.history.find(h => h.itemId === it.id && !h.returnedAt);
     return `<div class="item-card">
       <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
       <div class="item-card-name">${it.name}</div>
-      <div class="item-status-badge status-${st.css}">${st.label}${active ? ' ('+active.studentName+')':''}</div>
+      <div class="item-status-badge status-${st.css}">${st.available} / ${st.total} 남음</div>
       <div class="item-card-actions">
         <button class="btn-icon" onclick="showQR('${it.id}')">🔍 QR</button>
         <button class="btn-icon" onclick="openEditItem('${it.id}')">✏️ 수정</button>
@@ -243,7 +242,7 @@ function renderCatalog() {
     return `<div class="item-card" onclick="processQR('${it.id}')">
       <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
       <div class="item-card-name">${it.name}</div>
-      <div class="item-status-badge status-${st.css}">${st.label}</div>
+      <div class="item-status-badge status-${st.css}">${st.available} / ${st.total} 대여 가능</div>
     </div>`;
   }).join('');
 }
@@ -300,27 +299,44 @@ function processQR(itemId) {
   const it = db.items.find(i => i.id === itemId);
   if (!it) { alert("올바르지 않은 비품 QR입니다."); return; }
   
-  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
-  if (active && active.studentId !== currentUser.id && currentUser.role !== 'teacher') {
-    alert("다른 사람이 대여 중인 비품입니다."); return;
-  }
+  const st = getItemStatus(it);
+  const myActive = db.history.find(h => h.itemId === itemId && h.studentId === currentUser.id && !h.returnedAt);
 
   document.getElementById('borrowItemName').textContent = it.name;
-  document.getElementById('borrowConfirmMsg').textContent = active ? '이 비품을 반납하시겠습니까?' : '이 비품을 대여하시겠습니까?';
+  
+  if (myActive) {
+    document.getElementById('borrowConfirmMsg').textContent = '이 비품을 반납하시겠습니까?';
+  } else {
+    if (st.available <= 0) {
+      alert("현재 남은 수량이 없습니다.");
+      return;
+    }
+    document.getElementById('borrowConfirmMsg').textContent = `이 비품을 대여하시겠습니까? (현재 ${st.available}개 남음)`;
+  }
+
   openModal('modal-borrow');
   window.pendingItemId = itemId;
 }
 
 async function confirmBorrow() {
   const itemId = window.pendingItemId;
-  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
-  if (active) {
-    await fdb.collection("history").doc(active.firestoreId).update({ returnedAt: new Date().toISOString() });
+  // 내가 빌린 내역이 있는지 확인 (반납 처리용)
+  const myActive = db.history.find(h => h.itemId === itemId && h.studentId === currentUser.id && !h.returnedAt);
+  
+  if (myActive) {
+    await fdb.collection("history").doc(myActive.firestoreId).update({ returnedAt: new Date().toISOString() });
   } else {
-    await fdb.collection("history").add({
-      itemId, studentId: currentUser.id, studentName: currentUser.name, 
-      borrowedAt: new Date().toISOString(), returnedAt: null, classCode: currentUser.classCode
-    });
+    // 대여 가능 수량 재체크
+    const it = db.items.find(i => i.id === itemId);
+    const st = getItemStatus(it);
+    if (st.available > 0) {
+      await fdb.collection("history").add({
+        itemId, studentId: currentUser.id, studentName: currentUser.name, 
+        borrowedAt: new Date().toISOString(), returnedAt: null, classCode: currentUser.classCode
+      });
+    } else {
+      alert("그새 품절되었습니다!");
+    }
   }
   closeModal('modal-borrow');
 }
@@ -356,6 +372,7 @@ function openAddItemModal() {
   document.getElementById('modalItemTitle').textContent = '비품 추가';
   document.getElementById('editItemId').value = '';
   document.getElementById('itemName').value = '';
+  document.getElementById('itemTotalQuantity').value = 1;
   document.getElementById('itemImageData').value = '';
   document.getElementById('imagePreview').innerHTML = '사진 미리보기';
   openModal('modal-item');
@@ -368,8 +385,9 @@ function openEditItem(id) {
   document.getElementById('itemName').value = it.name;
   document.getElementById('itemCategory').value = it.category;
   document.getElementById('itemMaxDays').value = it.maxDays;
+  document.getElementById('itemTotalQuantity').value = it.totalQuantity || 1;
   document.getElementById('itemImageData').value = it.imgData || '';
-  document.getElementById('imagePreview').innerHTML = it.imgData ? `<img src="${it.imgData}" style="width:100%">` : '사진 미리보기';
+  document.getElementById('imagePreview').innerHTML = it.imgData ? `<img src="${it.imgData}" style="width:100%">` : '<span>📷 사진 선택</span>';
   openModal('modal-item');
 }
 
@@ -380,6 +398,7 @@ async function saveItem(e) {
     name: document.getElementById('itemName').value.trim(),
     category: document.getElementById('itemCategory').value,
     maxDays: parseInt(document.getElementById('itemMaxDays').value)||7,
+    totalQuantity: parseInt(document.getElementById('itemTotalQuantity').value)||1,
     imgData: document.getElementById('itemImageData').value,
     classCode: currentUser.classCode
   };
@@ -393,9 +412,15 @@ async function deleteItem(id) {
 }
 
 function getItemStatus(it) {
-  const active = db.history.find(h => h.itemId === it.id && !h.returnedAt);
-  if (!active) return { status:'available', label:'대여 가능', css:'available' };
-  return { status:'borrowed', label:'대여 중', css:'borrowed' };
+  const activeCount = db.history.filter(h => h.itemId === it.id && !h.returnedAt).length;
+  const total = it.totalQuantity || 1;
+  const available = total - activeCount;
+  return { 
+    available, 
+    total, 
+    css: available > 0 ? 'available' : 'borrowed',
+    label: available > 0 ? '대여 가능' : '수량 없음'
+  };
 }
 
 function fmt(iso) { return iso ? iso.split('T')[0] : '-'; }
