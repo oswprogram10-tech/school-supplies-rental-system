@@ -19,6 +19,7 @@ let currentUser = null;
 let selectedRole = 'teacher';
 let activeListeners = []; 
 let hasCheckedOverdue = false;
+let scannerInstance = null; // QR 스캐너 인스턴스
 
 // ===================== AUTH & NAVIGATION =====================
 function selectRole(role) {
@@ -190,11 +191,64 @@ function adminTab(tab) {
 
 function studentTab(tab) {
   if (!tab) tab = 'catalog';
+  stopScan(); // 다른 탭 이동 시 카메라 자동 정지
   document.querySelectorAll('.student-tab-content, .student-tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('stTab-' + tab).classList.add('active');
   document.getElementById('stBtn-' + tab).classList.add('active');
   if (tab === 'myborrow') renderMyBorrow();
   else if (tab === 'catalog') renderCatalog();
+}
+
+// ===================== QR SCANNER LOGIC =====================
+function startScan() {
+  const readerId = "qr-reader";
+  if (!document.getElementById(readerId)) return;
+  
+  stopScan(); // 이미 작동 중이면 중지
+
+  scannerInstance = new Html5Qrcode(readerId);
+  const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+
+  scannerInstance.start(
+    { facingMode: "environment" },
+    config,
+    (decodedText) => {
+      console.log("QR 스캔 성공:", decodedText);
+      stopScan(); // 스캔 성공 시 카메라 정지
+      processQR(decodedText);
+    },
+    (errorMessage) => { /* 에러 무시 */ }
+  ).catch(err => {
+    alert("카메라를 열 수 없습니다. 브라우저의 카메라 권한을 허용해 주세요.");
+    console.error("Camera Start Error:", err);
+  });
+}
+
+function stopScan() {
+  if (scannerInstance && scannerInstance.isScanning) {
+    scannerInstance.stop().then(() => {
+      console.log("카메라 정지 완료");
+    }).catch(err => console.error("Camera Stop Error:", err));
+  }
+}
+
+function processQR(itemId) {
+  const it = db.items.find(i => i.id === itemId);
+  if (!it) {
+    alert("올바르지 않은 비품 QR코드입니다.");
+    return;
+  }
+  document.getElementById('borrowItemName').textContent = it.name;
+  const active = db.history.find(h => h.itemId === itemId && !h.returnedAt);
+  
+  if (active && active.studentId !== currentUser.id && currentUser.role !== 'teacher') {
+    alert("다른 친구가 사용 중인 비품입니다.");
+    return;
+  }
+
+  document.getElementById('borrowConfirmMsg').textContent = active ? '이 비품을 반납하시겠습니까?' : '이 비품을 대여하시겠습니까?';
+  openModal('modal-borrow');
+  window.pendingItemId = itemId;
 }
 
 function renderDashboard() {
