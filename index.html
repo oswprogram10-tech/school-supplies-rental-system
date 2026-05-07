@@ -122,11 +122,12 @@
   <nav class="navbar">
     <div class="nav-left">
       <div class="logo">🍏 학급 비품 대여</div>
+      <span class="nav-badge admin-badge">관리자</span>
       <div class="nav-menu">
-        <button id="sideBtn-dashboard" class="nav-menu-btn active" onclick="adminTab('dashboard')">대시보드</button>
-        <button id="sideBtn-items" class="nav-menu-btn" onclick="adminTab('items')">비품 관리</button>
-        <button id="sideBtn-history" class="nav-menu-btn" onclick="adminTab('history')">대여 이력</button>
-        <button id="sideBtn-students" class="nav-menu-btn" onclick="adminTab('students')">학생 관리</button>
+        <button id="sideBtn-dashboard" class="nav-menu-btn active" onclick="adminTab('dashboard')">📊 대시보드</button>
+        <button id="sideBtn-items" class="nav-menu-btn" onclick="adminTab('items')">📦 비품 관리</button>
+        <button id="sideBtn-history" class="nav-menu-btn" onclick="adminTab('history')">📜 대여 이력</button>
+        <button id="sideBtn-students" class="nav-menu-btn" onclick="adminTab('students')">👥 학생 관리</button>
       </div>
     </div>
     <div class="nav-right">
@@ -245,10 +246,11 @@
   <nav class="navbar student-nav">
     <div class="nav-left">
       <div class="logo">🍏 학급 비품 대여</div>
+      <span class="nav-badge student-badge">학생</span>
       <div class="nav-menu">
-        <button id="stBtn-catalog" class="nav-menu-btn active" onclick="studentTab('catalog')">비품 목록</button>
-        <button id="stBtn-scan" class="nav-menu-btn" onclick="studentTab('scan')">QR 스캔</button>
-        <button id="stBtn-myborrow" class="nav-menu-btn" onclick="studentTab('myborrow')">내 대여 현황</button>
+        <button id="stBtn-catalog" class="nav-menu-btn active" onclick="studentTab('catalog')">📦 비품 목록</button>
+        <button id="stBtn-scan" class="nav-menu-btn" onclick="studentTab('scan')">📷 QR 스캔</button>
+        <button id="stBtn-myborrow" class="nav-menu-btn" onclick="studentTab('myborrow')">📋 내 대여 현황</button>
       </div>
     </div>
     <div class="nav-right">
