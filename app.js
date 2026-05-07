@@ -17,34 +17,57 @@ const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬'
 let db = { items: [], history: [] };
 let currentUser = null;
 let selectedRole = 'teacher';
-let activeListeners = []; // 실시간 리스너 관리용
+let activeListeners = []; 
+let hasCheckedOverdue = false; // 로그인 후 1회만 경고를 띄우기 위한 플래그
 
 // ===================== REAL-TIME SYNC (학급별 격리) =====================
 function initRealtimeSync(classCode) {
-  // 기존 리스너가 있다면 해제 (로그아웃 후 재로그인 대비)
   activeListeners.forEach(unsub => unsub());
   activeListeners = [];
+  hasCheckedOverdue = false; // 새 로그인 시 초기화
 
   console.log(`📡 [${classCode}] 학급 데이터 동기화 시작...`);
   
-  // 1. 해당 학급의 비품 목록만 감시
   const itemsUnsub = fdb.collection("items")
     .where("classCode", "==", classCode)
     .onSnapshot((snapshot) => {
       db.items = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
       if (db.items.length === 0 && currentUser.role === 'teacher') seedInitialData(classCode);
       refreshCurrentUI();
+      if (currentUser && currentUser.role === 'student') checkOverdueAlert();
     });
 
-  // 2. 해당 학급의 대여 이력만 감시
   const historyUnsub = fdb.collection("history")
     .where("classCode", "==", classCode)
     .onSnapshot((snapshot) => {
       db.history = snapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
       refreshCurrentUI();
+      if (currentUser && currentUser.role === 'student') checkOverdueAlert();
     });
 
   activeListeners.push(itemsUnsub, historyUnsub);
+}
+
+// 연체 경고 체크 함수
+function checkOverdueAlert() {
+  // 데이터가 모두 로드되었고 아직 이번 세션에서 경고를 띄우지 않았을 때만 실행
+  if (hasCheckedOverdue || !db.items.length || !db.history.length) return;
+
+  const myOverdueItems = db.history.filter(h => {
+    if (h.studentId !== currentUser.id || h.returnedAt) return false;
+    const item = db.items.find(i => i.id === h.itemId);
+    return item && isOverdue(h.borrowedAt, item.maxDays);
+  });
+
+  if (myOverdueItems.length > 0) {
+    const itemNames = myOverdueItems.map(h => {
+      const item = db.items.find(i => i.id === h.itemId);
+      return `[${item ? item.name : h.itemId}]`;
+    }).join(", ");
+    
+    alert(`⚠️ 연체 경고!\n\n현재 반납 기한이 지난 비품이 있습니다:\n${itemNames}\n\n다른 친구들을 위해 즉시 반납해 주세요!`);
+    hasCheckedOverdue = true; // 경고를 한 번 띄웠음을 표시
+  }
 }
 
 function refreshCurrentUI() {
