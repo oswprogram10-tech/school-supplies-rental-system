@@ -94,6 +94,14 @@ async function seedInitialData(classCode) {
 }
 
 // ===================== AUTH LOGIC =====================
+function selectRole(role) {
+  selectedRole = role;
+  const btnT = document.getElementById('roleTeacher');
+  const btnS = document.getElementById('roleStudent');
+  if (btnT) btnT.classList.toggle('active', role === 'teacher');
+  if (btnS) btnS.classList.toggle('active', role === 'student');
+}
+
 async function handleLogin(e) {
   e.preventDefault();
   const id = document.getElementById('loginId').value.trim();
@@ -104,11 +112,11 @@ async function handleLogin(e) {
     const userDoc = await fdb.collection("users").doc(id).get();
     if (userDoc.exists) {
       const userData = userDoc.data();
-      if (userData.pw === pw) {
+      // 비밀번호와 선택한 역할이 모두 일치해야 로그인 성공
+      if (userData.pw === pw && userData.role === selectedRole) {
         err.classList.add('hidden');
         currentUser = { id, ...userData };
         
-        // 로그인 성공 시 해당 학급 코드 데이터 동기화 시작
         initRealtimeSync(userData.classCode);
         
         if (userData.role === 'teacher') showAdmin();
@@ -118,6 +126,7 @@ async function handleLogin(e) {
     }
     err.classList.remove('hidden');
   } catch (error) {
+    console.error("Login Error:", error);
     alert("로그인 중 오류가 발생했습니다.");
   }
 }
@@ -141,7 +150,7 @@ async function handleSignUp(e) {
       createdAt: new Date().toISOString()
     });
 
-    alert(`회원가입 완료! 학급 코드 [${classCode}]로 로그인해 주세요.`);
+    alert(`회원가입 완료! [${selectedRole === 'teacher' ? '교사' : '학생'}] 로그인 화면에서 로그인해 주세요.`);
     showPage('page-login');
   } catch (error) {
     alert("회원가입 실패: " + error.message);
@@ -176,19 +185,20 @@ function logout() {
 // ===================== NAVIGATION =====================
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  const target = document.getElementById(id);
+  if (target) target.classList.add('active');
 }
 
 function showAdmin() {
-  document.getElementById('adminUserName').textContent = currentUser.name;
-  document.getElementById('adminClassBadge').textContent = currentUser.classCode;
+  if (document.getElementById('adminUserName')) document.getElementById('adminUserName').textContent = currentUser.name;
+  if (document.getElementById('adminClassBadge')) document.getElementById('adminClassBadge').textContent = currentUser.classCode;
   showPage('page-admin');
   adminTab('dashboard');
 }
 
 function showStudent() {
-  document.getElementById('studentUserName').textContent = currentUser.name;
-  document.getElementById('studentClassBadge').textContent = currentUser.classCode;
+  if (document.getElementById('studentUserName')) document.getElementById('studentUserName').textContent = currentUser.name;
+  if (document.getElementById('studentClassBadge')) document.getElementById('studentClassBadge').textContent = currentUser.classCode;
   showPage('page-student');
   studentTab('catalog');
 }
