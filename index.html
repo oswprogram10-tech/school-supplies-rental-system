@@ -27,6 +27,9 @@
 
 <!-- ===================== LOGIN PAGE ===================== -->
 <div id="page-login" class="page">
+  <!-- Theme Toggle Button for Login -->
+  <button class="btn-icon" style="position:absolute; top:20px; right:20px; z-index:10; font-size:20px;" onclick="toggleTheme()" id="loginThemeBtn">🌙</button>
+
   <div class="login-bg">
     <div class="login-orb orb1"></div>
     <div class="login-orb orb2"></div>
@@ -134,6 +137,7 @@
       <span class="nav-title">교실 비품 관리</span>
     </div>
     <div class="nav-right">
+      <button class="btn-icon-nav" onclick="toggleTheme()" id="adminThemeBtn" style="margin-right:10px;">🌙</button>
       <div class="nav-user"><span id="adminUserName">관리자</span> <span id="adminClassBadge" class="nav-badge admin-badge">-</span></div>
       <button class="btn-logout" onclick="logout()">로그아웃</button>
     </div>
@@ -171,20 +175,40 @@
           <h3>🔄 현재 대여 현황</h3>
           <div id="currentBorrowList" class="borrow-list"></div>
         </div>
+        <div class="card" style="margin-top:20px; border-color:var(--red);">
+          <h3 style="color:var(--red);">🚨 최근 비품 신고 내역</h3>
+          <div id="adminReportList" class="borrow-list"></div>
+        </div>
       </div>
 
       <!-- Items -->
       <div id="tab-items" class="tab-content">
         <div class="page-header">
           <h2>📦 비품 관리</h2>
-          <button class="btn-primary" onclick="openAddItemModal()">+ 비품 추가</button>
+          <div style="display:flex; gap:10px;">
+            <div class="filter-row">
+              <input type="text" id="adminSearchInput" placeholder="비품명 검색" onkeyup="renderItems()" />
+              <select id="adminCategoryFilter" onchange="renderItems()">
+                <option value="all">모든 카테고리</option>
+                <option value="문구">문구</option>
+                <option value="도서">도서</option>
+                <option value="실험도구">실험도구</option>
+                <option value="체육용품">체육용품</option>
+                <option value="기타">기타</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="openAddItemModal()">+ 추가</button>
+          </div>
         </div>
         <div class="items-grid" id="itemsGrid"></div>
       </div>
 
       <!-- History -->
       <div id="tab-history" class="tab-content">
-        <div class="page-header"><h2>📋 대여 이력</h2></div>
+        <div class="page-header">
+          <h2>📋 대여 이력</h2>
+          <button class="btn-secondary" onclick="exportHistoryCSV()">📥 엑셀(CSV) 내보내기</button>
+        </div>
         <div class="table-wrap">
           <table class="data-table">
             <thead><tr><th>번호</th><th>학생명</th><th>비품명</th><th>대여일</th><th>상태</th></tr></thead>
@@ -218,12 +242,16 @@
   <nav class="navbar student-nav">
     <div class="nav-brand"><span class="nav-logo">📚</span> <span class="nav-title">비품 대여</span></div>
     <div class="nav-right">
+      <button class="btn-icon-nav" onclick="toggleTheme()" id="studentThemeBtn" style="margin-right:10px;">🌙</button>
       <div class="nav-user"><span id="studentUserName">사용자</span> <span id="studentClassBadge" class="nav-badge student-badge">-</span></div>
       <button class="btn-logout" onclick="logout()">로그아웃</button>
     </div>
   </nav>
 
   <div class="student-layout">
+    <!-- Student Alert Banner -->
+    <div id="studentAlertBanner" class="alert-banner hidden"></div>
+
     <!-- Student Profile Card -->
     <div id="studentProfileCard" class="student-profile-card"></div>
 
@@ -255,6 +283,17 @@
     </div>
 
     <div id="stTab-catalog" class="student-tab-content">
+      <div class="filter-row" style="margin-bottom: 20px;">
+        <input type="text" id="studentSearchInput" placeholder="비품명 검색" onkeyup="renderCatalog()" style="flex:1;" />
+        <select id="studentCategoryFilter" onchange="renderCatalog()">
+          <option value="all">전체</option>
+          <option value="문구">문구</option>
+          <option value="도서">도서</option>
+          <option value="실험도구">실험도구</option>
+          <option value="체육용품">체육용품</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
       <div id="catalogGrid" class="items-grid"></div>
     </div>
 
@@ -289,13 +328,23 @@
           </select>
         </div>
         <div class="form-group">
+          <label>상태 (점검 모드)</label>
+          <select id="itemStatus">
+            <option value="정상">🟢 정상</option>
+            <option value="수리중">🟡 수리중</option>
+            <option value="분실">🔴 분실</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div class="form-group">
           <label>전체 수량 <span class="required">*</span></label>
           <input type="number" id="itemTotalQuantity" min="1" value="1" required />
         </div>
-      </div>
-      <div class="form-group">
-        <label>최대 대여 기간 (일)</label>
-        <input type="number" id="itemMaxDays" min="1" value="7" />
+        <div class="form-group">
+          <label>최대 대여 기간 (일)</label>
+          <input type="number" id="itemMaxDays" min="1" value="7" />
+        </div>
       </div>
       <div class="form-group">
         <label>비품 사진</label>
@@ -333,9 +382,9 @@
     <div style="padding:20px; text-align:center;">
       <h2 id="borrowItemName"></h2>
       <p id="borrowConfirmMsg"></p>
-      <div class="modal-actions" style="margin-top:20px;">
+      <div class="modal-actions">
         <button class="btn-secondary" onclick="closeModal('modal-borrow')">취소</button>
-        <button class="btn-primary" onclick="confirmBorrow()">확인</button>
+        <button class="btn-primary" id="btnBorrowConfirm" onclick="confirmBorrow()">확인</button>
       </div>
     </div>
   </div>
@@ -364,6 +413,27 @@
       <div class="modal-actions">
         <button type="button" class="btn-secondary" onclick="closeModal('modal-point')">취소</button>
         <button type="submit" class="btn-primary">적용</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Report Modal (Student) -->
+<div id="modal-report" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-report')">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 style="color:var(--red);">🚨 상태 신고</h3>
+      <button class="modal-close" onclick="closeModal('modal-report')">✕</button>
+    </div>
+    <form onsubmit="submitReport(event)" class="modal-form">
+      <div style="text-align:center; margin-bottom:16px; font-size:18px; font-weight:700;" id="reportItemName"></div>
+      <div class="form-group">
+        <label>신고 내용 <span class="required">*</span></label>
+        <textarea id="reportContent" rows="4" placeholder="예: 잉크가 안 나와요, 테두리가 파손되어 있어요" required></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeModal('modal-report')">취소</button>
+        <button type="submit" class="btn-danger">신고하기</button>
       </div>
     </form>
   </div>

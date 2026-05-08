@@ -21,7 +21,7 @@ const GRADES = [
   { name:'Banned', icon:'🚫', min:-Infinity, color:'#7f1d1d', maxBorrow: 0 }
 ];
 
-let db = { items: [], history: [], pointHistory: [] };
+let db = { items: [], history: [], pointHistory: [], reports: [], waitlists: [] };
 let currentUser = null;
 let selectedRole = 'teacher';
 let activeListeners = [];
@@ -161,20 +161,97 @@ function initRealtimeSync(classCode) {
       if (currentUser && currentUser.role === 'student') renderStudentProfile();
     });
 
-  activeListeners.push(itemsUnsub, historyUnsub, pointUnsub);
+  const reportsUnsub = fdb.collection("reports").onSnapshot(snap => {
+    db.reports = snap.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+    if (currentUser && currentUser.role === 'admin') renderDashboard();
+  });
+
+  const waitlistsUnsub = fdb.collection("waitlists").where("classCode", "==", classCode).onSnapshot(snap => {
+    db.waitlists = snap.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+    if (currentUser && currentUser.role === 'student') updateStudentAlerts();
+  });
+
+  activeListeners.push(itemsUnsub, historyUnsub, pointUnsub, reportsUnsub, waitlistsUnsub);
 }
 
 function checkOverdueAlert() {
   if (hasCheckedOverdue || !db.items.length || !db.history.length) return;
-  const overdue = db.history.filter(h => {
-    if (h.studentId !== currentUser.id || h.returnedAt) return false;
-    const item = db.items.find(i => i.id === h.itemId);
-    return item && (Date.now() - new Date(h.borrowedAt)) > item.maxDays * 86400000;
+  updateStudentAlerts();
+  hasCheckedOverdue = true;
+}
+
+function updateStudentAlerts() {
+  const banner = document.getElementById('studentAlertBanner');
+  if(!banner || !currentUser || currentUser.role !== 'student') return;
+  
+  const myActive = db.history.filter(h => h.studentId === currentUser.id && !h.returnedAt);
+  let overdueCount = 0;
+  let dueTomorrowCount = 0;
+  
+  myActive.forEach(h => {
+    const it = db.items.find(i => i.id === h.itemId);
+    const maxDays = it ? (it.maxDays || 7) : 7;
+    const elapsedDays = (Date.now() - new Date(h.borrowedAt).getTime()) / 86400000;
+    
+    if(elapsedDays > maxDays) overdueCount++;
+    else if(elapsedDays > maxDays - 1) dueTomorrowCount++;
   });
-  if (overdue.length > 0) {
-    alert("⚠️ 연체된 비품이 있습니다! 목록에서 확인 후 반납해 주세요.");
-    hasCheckedOverdue = true;
+  
+  let availableWaitlist = [];
+  if (db.waitlists) {
+    const myWaitlists = db.waitlists.filter(w => w.studentId === currentUser.id);
+    myWaitlists.forEach(w => {
+      const it = db.items.find(i => i.id === w.itemId);
+      if (it && getItemStatus(it).available > 0) {
+        availableWaitlist.push(it.name);
+      }
+    });
   }
+
+  if (availableWaitlist.length > 0) {
+    banner.className = 'alert-banner';
+    banner.style.borderColor = 'var(--green)';
+    banner.style.background = 'rgba(16, 185, 129, 0.1)';
+    banner.innerHTML = `<span>🎉</span> <div style="color:var(--green);"><b>대기 완료!</b> 기다리시던 [${availableWaitlist.join(', ')}] 비품이 반납되었습니다. 지금 바로 대여하세요!</div>`;
+  } else if (overdueCount > 0) {
+    banner.className = 'alert-banner'; // red
+    banner.style.borderColor = ''; banner.style.background = '';
+    banner.innerHTML = `<span>🚨</span> <div><b>연체 주의!</b> 반납 기한이 지난 비품이 ${overdueCount}개 있습니다. 신속히 반납해주세요!</div>`;
+  } else if (dueTomorrowCount > 0) {
+    banner.className = 'alert-banner warning'; // yellow
+    banner.style.borderColor = ''; banner.style.background = '';
+    banner.innerHTML = `<span>⚠️</span> <div><b>반납 임박!</b> 내일이 반납 기한인 비품이 ${dueTomorrowCount}개 있습니다.</div>`;
+  } else {
+    banner.className = 'alert-banner hidden';
+  }
+}
+
+let currentReportItemId = '';
+function openReportModal(itemId) {
+  currentReportItemId = itemId;
+  const it = db.items.find(i => i.id === itemId);
+  document.getElementById('reportItemName').textContent = it ? it.name : '비품';
+  document.getElementById('reportContent').value = '';
+  openModal('modal-report');
+}
+
+async function submitReport(e) {
+  e.preventDefault();
+  const content = document.getElementById('reportContent').value.trim();
+  if(!content) return;
+  
+  const it = db.items.find(i => i.id === currentReportItemId);
+  await fdb.collection("reports").add({
+    itemId: currentReportItemId,
+    itemName: it ? it.name : 'Unknown',
+    studentId: currentUser.id,
+    studentName: currentUser.name,
+    content: content,
+    timestamp: new Date().toISOString()
+  });
+  
+  alert("신고가 접수되었습니다.");
+  closeModal('modal-report');
 }
 
 function refreshCurrentUI() {
@@ -233,15 +310,34 @@ function renderDashboard() {
     const it = db.items.find(i => i.id === h.itemId);
     return `<div class="borrow-item">${it?.name || '정보없음'} (${h.studentName})</div>`;
   }).join('') : '대여 중인 비품 없음';
+
+  const reportsHtml = db.reports.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,5).map(r => `
+    <div style="background:var(--card2); padding:10px; border-radius:8px; margin-bottom:8px; border-left:4px solid var(--red);">
+      <div style="font-weight:600; font-size:13px;">[${r.itemName}] ${r.studentName}</div>
+      <div style="font-size:13px; color:var(--text); margin-top:4px;">${r.content}</div>
+      <div style="font-size:11px; color:var(--text2); margin-top:4px;">${fmt(r.timestamp)}</div>
+    </div>
+  `).join('');
+  document.getElementById('adminReportList').innerHTML = reportsHtml || '<div style="color:var(--text2); font-size:13px;">최근 신고 내역이 없습니다.</div>';
 }
 
 function renderItems() {
   const g = document.getElementById('itemsGrid');
-  g.innerHTML = db.items.map(it => {
+  const searchStr = document.getElementById('adminSearchInput')?.value.toLowerCase() || '';
+  const categoryFilter = document.getElementById('adminCategoryFilter')?.value || 'all';
+
+  const filteredItems = db.items.filter(it => {
+    const matchSearch = it.name.toLowerCase().includes(searchStr);
+    const matchCat = categoryFilter === 'all' || it.category === categoryFilter;
+    return matchSearch && matchCat;
+  });
+
+  g.innerHTML = filteredItems.map(it => {
     const st = getItemStatus(it);
-    return `<div class="item-card">
+    const statusLabel = it.status && it.status !== '정상' ? `<span style="color:var(--red); font-size:12px;">[${it.status}]</span>` : '';
+    return `<div class="item-card ${it.status && it.status !== '정상' ? 'unavailable' : ''}">
       <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
-      <div class="item-card-name">${it.name}</div>
+      <div class="item-card-name">${it.name} ${statusLabel}</div>
       <div class="item-status-badge status-${st.css}">${st.available} / ${st.total} 남음</div>
       <div class="item-card-actions">
         <button class="btn-icon" onclick="showQR('${it.id}')">🔍 QR</button>
@@ -254,7 +350,17 @@ function renderItems() {
 
 function renderCatalog() {
   const g = document.getElementById('catalogGrid');
-  g.innerHTML = db.items.map(it => {
+  const searchStr = document.getElementById('studentSearchInput')?.value.toLowerCase() || '';
+  const categoryFilter = document.getElementById('studentCategoryFilter')?.value || 'all';
+
+  const filteredItems = db.items.filter(it => {
+    if (it.status && it.status !== '정상') return false; // 점검 모드 항목 숨김
+    const matchSearch = it.name.toLowerCase().includes(searchStr);
+    const matchCat = categoryFilter === 'all' || it.category === categoryFilter;
+    return matchSearch && matchCat;
+  });
+
+  g.innerHTML = filteredItems.map(it => {
     const st = getItemStatus(it);
     return `<div class="item-card" onclick="processQR('${it.id}')">
       <div class="item-emoji">${it.imgData ? `<img src="${it.imgData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">` : CATEGORY_EMOJI[it.category]||'📦'}</div>
@@ -275,7 +381,16 @@ function renderStudents() {
   const list = document.getElementById('studentsList');
   fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").get().then(snap => {
     const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.points||0) - (a.points||0));
-    list.innerHTML = students.map((s, i) => {
+    
+    const top3 = students.slice(0, 3).filter(s => (s.points || 0) > 0);
+    const topHtml = top3.length > 0 ? `<div style="background:linear-gradient(135deg, #fffbeb, #fef3c7); border:1px solid #fde68a; border-radius:12px; padding:16px; margin-bottom:20px; color:#92400e;">
+      <h3 style="margin-bottom:10px; font-size:16px;">🏆 이달의 우수 학생</h3>
+      <div style="display:flex; gap:12px; font-size:14px; flex-wrap:wrap;">
+        ${top3.map((s, i) => `<div style="background:#fff; padding:4px 10px; border-radius:20px;"><b>${i+1}위</b> ${s.name}(${s.points||0}점)</div>`).join('')}
+      </div>
+    </div>` : '';
+
+    list.innerHTML = topHtml + students.map((s, i) => {
       const g = getGrade(s.points||0);
       return `<div class="student-card-v2">
         <div class="sc-rank">${i+1}</div>
@@ -332,10 +447,17 @@ function renderStats() {
 
 function renderMyBorrow() {
   const active = db.history.filter(h => h.studentId === currentUser.id && !h.returnedAt);
-  document.getElementById('myBorrowList').innerHTML = active.map(h => `<div class="my-borrow-card">
-    <b>${db.items.find(i=>i.id===h.itemId)?.name || h.itemId}</b> (대여일: ${fmt(h.borrowedAt)})
-    <button class="btn-secondary" onclick="processQR('${h.itemId}')">반납하기</button>
+  document.getElementById('myBorrowList').innerHTML = active.map(h => `<div class="my-borrow-card" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <b>${db.items.find(i=>i.id===h.itemId)?.name || h.itemId}</b><br>
+      <span style="font-size:12px; color:var(--text2);">대여일: ${fmt(h.borrowedAt)}</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-report" onclick="openReportModal('${h.itemId}')">🚨 신고</button>
+      <button class="btn-secondary" onclick="processQR('${h.itemId}')">반납</button>
+    </div>
   </div>`).join('');
+  updateStudentAlerts();
 }
 
 // ===================== QR & SCAN =====================
@@ -373,14 +495,27 @@ function processQR(itemId) {
 
   document.getElementById('borrowItemName').textContent = it.name;
   
+  const btnConfirm = document.getElementById('btnBorrowConfirm');
   if (myActive) {
     document.getElementById('borrowConfirmMsg').textContent = '이 비품을 반납하시겠습니까?';
+    if(btnConfirm) {
+      btnConfirm.textContent = '확인';
+      btnConfirm.setAttribute('onclick', 'confirmBorrow()');
+    }
   } else {
     if (st.available <= 0) {
-      alert("현재 남은 수량이 없습니다.");
-      return;
+      document.getElementById('borrowConfirmMsg').textContent = `현재 모두 대여 중입니다. 반납 시 알림을 받으시겠습니까?`;
+      if(btnConfirm) {
+        btnConfirm.textContent = '대기 신청';
+        btnConfirm.setAttribute('onclick', 'confirmWaitlist()');
+      }
+    } else {
+      document.getElementById('borrowConfirmMsg').textContent = `이 비품을 대여하시겠습니까? (현재 ${st.available}개 남음)`;
+      if(btnConfirm) {
+        btnConfirm.textContent = '확인';
+        btnConfirm.setAttribute('onclick', 'confirmBorrow()');
+      }
     }
-    document.getElementById('borrowConfirmMsg').textContent = `이 비품을 대여하시겠습니까? (현재 ${st.available}개 남음)`;
   }
 
   openModal('modal-borrow');
@@ -421,7 +556,29 @@ async function confirmBorrow() {
         itemId, studentId: currentUser.id, studentName: currentUser.name,
         borrowedAt: now, returnedAt: null, classCode: currentUser.classCode
       });
+      // 대기 명단에서 제거
+      const wList = db.waitlists?.find(w => w.itemId === itemId && w.studentId === currentUser.id);
+      if (wList) await fdb.collection("waitlists").doc(wList.firestoreId).delete();
     } else { alert("그새 품절되었습니다!"); }
+  }
+  closeModal('modal-borrow');
+}
+
+async function confirmWaitlist() {
+  const itemId = window.pendingItemId;
+  const it = db.items.find(i => i.id === itemId);
+  
+  const existing = db.waitlists?.find(w => w.itemId === itemId && w.studentId === currentUser.id);
+  if (existing) {
+    alert("이미 대기 명단에 등록되어 있습니다.");
+  } else {
+    await fdb.collection("waitlists").add({
+      itemId, itemName: it ? it.name : 'Unknown',
+      studentId: currentUser.id, studentName: currentUser.name,
+      classCode: currentUser.classCode,
+      timestamp: new Date().toISOString()
+    });
+    alert(`[${it.name}] 대기 신청이 완료되었습니다. 반납되면 로그인 시 알림을 보내드립니다!`);
   }
   closeModal('modal-borrow');
 }
@@ -457,6 +614,7 @@ function openAddItemModal() {
   document.getElementById('modalItemTitle').textContent = '비품 추가';
   document.getElementById('editItemId').value = '';
   document.getElementById('itemName').value = '';
+  document.getElementById('itemStatus').value = '정상';
   document.getElementById('itemTotalQuantity').value = 1;
   document.getElementById('itemImageData').value = '';
   document.getElementById('imagePreview').innerHTML = '사진 미리보기';
@@ -469,6 +627,7 @@ function openEditItem(id) {
   document.getElementById('editItemId').value = id;
   document.getElementById('itemName').value = it.name;
   document.getElementById('itemCategory').value = it.category;
+  document.getElementById('itemStatus').value = it.status || '정상';
   document.getElementById('itemMaxDays').value = it.maxDays;
   document.getElementById('itemTotalQuantity').value = it.totalQuantity || 1;
   document.getElementById('itemImageData').value = it.imgData || '';
@@ -482,6 +641,7 @@ async function saveItem(e) {
   const data = {
     name: document.getElementById('itemName').value.trim(),
     category: document.getElementById('itemCategory').value,
+    status: document.getElementById('itemStatus').value,
     maxDays: parseInt(document.getElementById('itemMaxDays').value)||7,
     totalQuantity: parseInt(document.getElementById('itemTotalQuantity').value)||1,
     imgData: document.getElementById('itemImageData').value,
@@ -513,6 +673,42 @@ function openModal(id) { document.getElementById(id).classList.remove('hidden');
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
 function toggleSidebar() { document.querySelector('.admin-layout')?.classList.toggle('sidebar-collapsed'); }
+
+function toggleTheme() {
+  document.body.classList.toggle('light-mode');
+  const isLight = document.body.classList.contains('light-mode');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  const icon = isLight ? '🌞' : '🌙';
+  ['loginThemeBtn', 'adminThemeBtn', 'studentThemeBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = icon;
+  });
+}
+
+function exportHistoryCSV() {
+  if (!db.history.length) {
+    alert("내보낼 데이터가 없습니다."); return;
+  }
+  const headers = ["번호", "학생명", "아이디", "비품명", "대여일", "반납일", "상태"];
+  const rows = [...db.history].sort((a,b)=>new Date(b.borrowedAt)-new Date(a.borrowedAt)).map((h, i) => {
+    const itemName = db.items.find(it=>it.id===h.itemId)?.name || h.itemId;
+    const status = h.returnedAt ? '반납완료' : '대여중';
+    return [i+1, h.studentName, h.studentId, itemName, fmt(h.borrowedAt), fmt(h.returnedAt), status];
+  });
+  
+  let csvContent = "\uFEFF" + headers.join(",") + "\n"; // \uFEFF ensures UTF-8 BOM for Excel
+  rows.forEach(row => {
+    csvContent += row.join(",") + "\n";
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `대여이력_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ===================== POINT SYSTEM =====================
 function getGrade(pts) {
@@ -555,6 +751,17 @@ function renderStudentProfile() {
   const activeCount = db.history.filter(h => h.studentId === currentUser.id && !h.returnedAt).length;
   const remainingBorrow = Math.max(0, g.maxBorrow - activeCount);
 
+  // 뱃지 계산 로직
+  const myHistories = db.history.filter(h => h.studentId === currentUser.id);
+  const myPointHistories = db.pointHistory.filter(p => p.userId === currentUser.id);
+  
+  let badges = [];
+  if (myPointHistories.filter(p => p.reason === '조기 반납 보너스').length >= 3) badges.push('🦅 얼리버드');
+  if (myHistories.length >= 5 && !myPointHistories.some(p => p.type === 'minus')) badges.push('✨ 깔끔쟁이');
+  if (myHistories.filter(h => db.items.find(i => i.id === h.itemId)?.category === '도서').length >= 3) badges.push('📚 독서왕');
+
+  const badgesHtml = badges.length > 0 ? `<div style="margin-top:10px; font-size:12px; color:var(--text2);">획득 뱃지: <b style="color:var(--accent2);">${badges.join(' ')}</b></div>` : '';
+
   const pctText = next ? `다음 등급(${next.icon})까지 ${next.min - pts}점` : '최고 등급 달성!';
   const pct = next ? Math.min(100, Math.max(0, ((pts - (g.min < 0 ? g.min : 0)) / (next.min - (g.min < 0 ? g.min : 0))) * 100)) : 100;
   const myHist = db.pointHistory.filter(p => p.userId === currentUser.id).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5);
@@ -572,6 +779,7 @@ function renderStudentProfile() {
       </div>
       <div class="profile-points"><span>${pts}</span>점</div>
     </div>
+    ${badgesHtml}
     <div class="profile-progress-wrap">
       <div class="profile-progress-bar"><div class="profile-progress-fill" style="width:${pct}%; background:${g.color}"></div></div>
       <div class="profile-progress-label">${pctText}</div>
@@ -611,6 +819,16 @@ async function submitPointAdjust(e) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // 저장된 테마 불러오기
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'light') {
+    document.body.classList.add('light-mode');
+    ['loginThemeBtn', 'adminThemeBtn', 'studentThemeBtn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.textContent = '🌞';
+    });
+  }
+
   // 스플래시 화면을 2.5초간 보여준 후 로그인 화면으로 이동
   setTimeout(() => {
     showPage('page-login');
