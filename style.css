@@ -519,6 +519,31 @@ body { font-family: 'Pretendard', 'Segoe UI', sans-serif; background: var(--bg);
   transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Borrow Limit Styles */
+.profile-limit {
+  text-align: right;
+  margin-right: 15px;
+  padding-right: 15px;
+  border-right: 1.5px solid var(--border);
+}
+.limit-label {
+  font-size: 11px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+.limit-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.limit-value span {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--green);
+}
+
 /* Splash Screen Styles */
 #page-splash {
   background: var(--bg);

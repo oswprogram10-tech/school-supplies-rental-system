@@ -14,11 +14,11 @@ const fdb = firebase.firestore();
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','기타':'📦' };
 const GRADES = [
-  { name:'Gold', icon:'🥇', min:300, color:'#f59e0b' },
-  { name:'Silver', icon:'🥈', min:100, color:'#94a3b8' },
-  { name:'Bronze', icon:'🥉', min:0, color:'#b45309' },
-  { name:'Warning', icon:'⚠️', min:-49, color:'#ef4444' },
-  { name:'Banned', icon:'🚫', min:-Infinity, color:'#7f1d1d' }
+  { name:'Gold', icon:'🥇', min:300, color:'#f59e0b', maxBorrow: 10 },
+  { name:'Silver', icon:'🥈', min:100, color:'#94a3b8', maxBorrow: 5 },
+  { name:'Bronze', icon:'🥉', min:0, color:'#b45309', maxBorrow: 3 },
+  { name:'Warning', icon:'⚠️', min:-49, color:'#ef4444', maxBorrow: 1 },
+  { name:'Banned', icon:'🚫', min:-Infinity, color:'#7f1d1d', maxBorrow: 0 }
 ];
 
 let db = { items: [], history: [], pointHistory: [] };
@@ -539,15 +539,25 @@ function renderStudentProfile() {
   const pts = currentUser.points || 0;
   const g = getGrade(pts);
   const next = getNextGrade(pts);
+  
+  // 남은 대여 횟수 계산
+  const activeCount = db.history.filter(h => h.studentId === currentUser.id && !h.returnedAt).length;
+  const remainingBorrow = Math.max(0, g.maxBorrow - activeCount);
+
   const pctText = next ? `다음 등급(${next.icon})까지 ${next.min - pts}점` : '최고 등급 달성!';
   const pct = next ? Math.min(100, Math.max(0, ((pts - (g.min < 0 ? g.min : 0)) / (next.min - (g.min < 0 ? g.min : 0))) * 100)) : 100;
   const myHist = db.pointHistory.filter(p => p.userId === currentUser.id).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5);
+  
   el.innerHTML = `
     <div class="profile-top">
       <div class="profile-grade-icon">${g.icon}</div>
       <div class="profile-info">
         <div class="profile-name">${currentUser.name}</div>
         <div class="profile-grade-name" style="color:${g.color}">${g.name} 등급</div>
+      </div>
+      <div class="profile-limit">
+        <div class="limit-label">남은 대여 횟수</div>
+        <div class="limit-value"><span>${remainingBorrow}</span> / ${g.maxBorrow}</div>
       </div>
       <div class="profile-points"><span>${pts}</span>점</div>
     </div>
