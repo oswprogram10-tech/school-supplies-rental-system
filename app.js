@@ -393,6 +393,17 @@ async function confirmBorrow() {
   const now = new Date().toISOString();
 
   if (myActive) {
+    // 최소 대여 시간 체크 (1시간 = 3600000ms)
+    const minBorrowTime = 3600000;
+    const timeElapsed = Date.now() - new Date(myActive.borrowedAt).getTime();
+    
+    if (timeElapsed < minBorrowTime) {
+      const remainingMin = Math.ceil((minBorrowTime - timeElapsed) / 60000);
+      alert(`최소 대여 시간은 1시간입니다. ${remainingMin}분 후에 다시 시도해 주세요.`);
+      closeModal('modal-borrow');
+      return;
+    }
+
     // 반납 처리 + 자동 점수 계산
     await fdb.collection("history").doc(myActive.firestoreId).update({ returnedAt: now });
     const it = db.items.find(i => i.id === itemId);
