@@ -12,7 +12,7 @@ firebase.initializeApp(firebaseConfig);
 const fdb = firebase.firestore();
 
 // ===================== DATA & STATE =====================
-const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','기타':'📦' };
+const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
 const GRADES = [
   { name:'Gold', icon:'🥇', min:300, color:'#f59e0b', maxBorrow: 10 },
   { name:'Silver', icon:'🥈', min:100, color:'#94a3b8', maxBorrow: 5 },
