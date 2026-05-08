@@ -54,6 +54,11 @@ async function handleLogin(e) {
     if (userDoc.exists) {
       const userData = userDoc.data();
       if (userData.pw === pw && userData.role === selectedRole) {
+        if (userData.role === 'student' && userData.status === 'pending') {
+          err.textContent = "가입 승인 대기 중입니다. 선생님께 문의하세요.";
+          err.classList.remove('hidden');
+          return;
+        }
         err.classList.add('hidden');
         currentUser = { id, ...userData };
         initRealtimeSync(userData.classCode);
@@ -83,6 +88,7 @@ async function handleSignUp(e) {
     await fdb.collection("users").doc(id).set({
       role, classCode, pw, name,
       points: 0, grade: 'Bronze',
+      status: role === 'teacher' ? 'approved' : 'pending',
       createdAt: new Date().toISOString()
     });
 
@@ -281,6 +287,7 @@ function adminTab(tab) {
   else if (tab === 'items') renderItems();
   else if (tab === 'history') renderHistory();
   else if (tab === 'students') renderStudents();
+  else if (tab === 'approvals') renderApprovals();
   else if (tab === 'stats') renderStats();
 }
 
@@ -379,7 +386,7 @@ function renderHistory() {
 
 function renderStudents() {
   const list = document.getElementById('studentsList');
-  fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").get().then(snap => {
+  fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").where("status", "==", "approved").get().then(snap => {
     const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.points||0) - (a.points||0));
     
     const top3 = students.slice(0, 3).filter(s => (s.points || 0) > 0);
@@ -816,6 +823,42 @@ async function submitPointAdjust(e) {
   await addPoints(window.pendingPointUserId, change, reason);
   closeModal('modal-point');
   renderStudents();
+}
+
+function renderApprovals() {
+  const list = document.getElementById('pendingApprovalsList');
+  if (!list) return;
+  fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").where("status", "==", "pending").get().then(snap => {
+    const pendings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    list.innerHTML = pendings.map(s => `
+      <div class="student-card-v2" style="border-left: 4px solid var(--accent2);">
+        <div class="sc-info">
+          <div class="sc-name">🐣 ${s.name}</div>
+          <div class="sc-meta">${s.id} · 가입 요청함</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-primary" onclick="approveUser('${s.id}')">승인</button>
+          <button class="btn-danger" onclick="rejectUser('${s.id}')">거절</button>
+        </div>
+      </div>
+    `).join('') || '<div class="empty-state">승인 대기 중인 학생이 없습니다.</div>';
+  });
+}
+
+async function approveUser(id) {
+  if (confirm('이 학생의 가입을 승인하시겠습니까?')) {
+    await fdb.collection("users").doc(id).update({ status: 'approved' });
+    alert('승인되었습니다.');
+    renderApprovals();
+  }
+}
+
+async function rejectUser(id) {
+  if (confirm('가입 요청을 거절하고 삭제하시겠습니까?')) {
+    await fdb.collection("users").doc(id).delete();
+    alert('거절되었습니다.');
+    renderApprovals();
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

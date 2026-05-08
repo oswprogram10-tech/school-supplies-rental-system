@@ -157,6 +157,9 @@
       <button class="sidebar-btn" id="sideBtn-students" onclick="adminTab('students')">
         <span>👥</span> <span class="btn-text">학생 현황</span>
       </button>
+      <button class="sidebar-btn" id="sideBtn-approvals" onclick="adminTab('approvals')">
+        <span>👤</span> <span class="btn-text">가입 승인</span>
+      </button>
       <button class="sidebar-btn" id="sideBtn-stats" onclick="adminTab('stats')">
         <span>📈</span> <span class="btn-text">대여 통계</span>
       </button>
@@ -216,6 +219,14 @@
             <tbody id="historyBody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Approvals -->
+      <div id="tab-approvals" class="tab-content">
+        <div class="page-header">
+          <h2>👤 가입 승인 관리</h2>
+        </div>
+        <div id="pendingApprovalsList" class="students-list"></div>
       </div>
 
       <!-- Students -->
