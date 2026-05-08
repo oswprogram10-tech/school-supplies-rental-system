@@ -61,7 +61,7 @@
       <div id="loginError" class="login-error hidden">아이디, 비밀번호 또는 역할이 올바르지 않습니다.</div>
       <button type="submit" class="btn-primary login-btn">로그인</button>
       <div class="login-footer">
-        <a href="#" onclick="showPage('page-signup')">회원가입</a>
+        <a href="#" onclick="showPage('page-signup'); toggleSignupClassInput();">회원가입</a>
         <span class="divider">|</span>
         <a href="#" onclick="showPage('page-find-auth')">계정 찾기</a>
       </div>
@@ -82,14 +82,18 @@
     <form class="login-form" onsubmit="handleSignUp(event)">
       <div class="form-group">
         <label>구분 <span class="required">*</span></label>
-        <select id="signupRole">
+        <select id="signupRole" onchange="toggleSignupClassInput()">
           <option value="student">학생</option>
           <option value="teacher">교사 (관리자)</option>
         </select>
       </div>
       <div class="form-group">
         <label>학급 코드 <span class="required">*</span></label>
-        <input type="text" id="signupClassCode" placeholder="예: 3-2 (교사/학생 동일하게 입력)" required />
+        <div id="signupClassCodeWrapper">
+          <select id="signupClassCode" required>
+            <option value="">학급 선택 중...</option>
+          </select>
+        </div>
       </div>
       <div class="form-group">
         <label>아이디 <span class="required">*</span></label>

@@ -125,6 +125,27 @@ function logout() {
   showPage('page-login');
 }
 
+async function toggleSignupClassInput() {
+  const role = document.getElementById('signupRole').value;
+  const wrapper = document.getElementById('signupClassCodeWrapper');
+  
+  if (role === 'teacher') {
+    wrapper.innerHTML = `<input type="text" id="signupClassCode" placeholder="예: 3-2 (새로운 코드 생성)" required />`;
+  } else {
+    wrapper.innerHTML = `<select id="signupClassCode" required><option value="">학급 정보를 불러오는 중...</option></select>`;
+    try {
+      const snap = await fdb.collection("users").where("role", "==", "teacher").get();
+      const codes = [...new Set(snap.docs.map(doc => doc.data().classCode))].sort();
+      
+      let html = codes.length > 0 ? '<option value="">학급을 선택하세요</option>' : '<option value="">등록된 학급이 없습니다</option>';
+      html += codes.map(c => `<option value="${c}">${c}</option>`).join('');
+      document.getElementById('signupClassCode').innerHTML = html;
+    } catch (e) {
+      document.getElementById('signupClassCode').innerHTML = '<option value="">로딩 실패</option>';
+    }
+  }
+}
+
 function showAdmin() {
   document.getElementById('adminUserName').textContent = currentUser.name;
   document.getElementById('adminClassBadge').textContent = currentUser.classCode;
