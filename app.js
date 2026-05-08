@@ -13,11 +13,18 @@ const fdb = firebase.firestore();
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','기타':'📦' };
+const GRADES = [
+  { name:'Gold', icon:'🥇', min:300, color:'#f59e0b' },
+  { name:'Silver', icon:'🥈', min:100, color:'#94a3b8' },
+  { name:'Bronze', icon:'🥉', min:0, color:'#b45309' },
+  { name:'Warning', icon:'⚠️', min:-49, color:'#ef4444' },
+  { name:'Banned', icon:'🚫', min:-Infinity, color:'#7f1d1d' }
+];
 
-let db = { items: [], history: [] };
+let db = { items: [], history: [], pointHistory: [] };
 let currentUser = null;
 let selectedRole = 'teacher';
-let activeListeners = []; 
+let activeListeners = [];
 let hasCheckedOverdue = false;
 let scannerInstance = null;
 
@@ -75,6 +82,7 @@ async function handleSignUp(e) {
 
     await fdb.collection("users").doc(id).set({
       role, classCode, pw, name,
+      points: 0, grade: 'Bronze',
       createdAt: new Date().toISOString()
     });
 
@@ -122,6 +130,7 @@ function showStudent() {
   document.getElementById('studentUserName').textContent = currentUser.name;
   document.getElementById('studentClassBadge').textContent = currentUser.classCode;
   showPage('page-student');
+  renderStudentProfile();
   studentTab('catalog');
 }
 
@@ -146,7 +155,13 @@ function initRealtimeSync(classCode) {
       if (currentUser && currentUser.role === 'student') checkOverdueAlert();
     });
 
-  activeListeners.push(itemsUnsub, historyUnsub);
+  const pointUnsub = fdb.collection("pointHistory").where("classCode", "==", classCode)
+    .onSnapshot(snap => {
+      db.pointHistory = snap.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id }));
+      if (currentUser && currentUser.role === 'student') renderStudentProfile();
+    });
+
+  activeListeners.push(itemsUnsub, historyUnsub, pointUnsub);
 }
 
 function checkOverdueAlert() {
@@ -202,6 +217,7 @@ function studentTab(tab) {
   if (tab === 'myborrow') renderMyBorrow();
   else if (tab === 'catalog') renderCatalog();
   else if (tab === 'scan') startScan();
+  else if (tab === 'mypoints') renderMyPointHistory();
 }
 
 function renderDashboard() {
@@ -257,7 +273,18 @@ function renderHistory() {
 function renderStudents() {
   const list = document.getElementById('studentsList');
   fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").get().then(snap => {
-    list.innerHTML = snap.docs.map(doc => `<div class="student-card">🎒 ${doc.data().name} (${doc.id})</div>`).join('');
+    const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.points||0) - (a.points||0));
+    list.innerHTML = students.map((s, i) => {
+      const g = getGrade(s.points||0);
+      return `<div class="student-card-v2">
+        <div class="sc-rank">${i+1}</div>
+        <div class="sc-info">
+          <div class="sc-name">${g.icon} ${s.name}</div>
+          <div class="sc-meta">${s.id} · ${g.name} · <b>${s.points||0}점</b></div>
+        </div>
+        <button class="btn-icon" onclick="openPointModal('${s.id}','${s.name}',${s.points||0})">±점수</button>
+      </div>`;
+    }).join('') || '<div class="empty-state">등록된 학생이 없습니다.</div>';
   });
 }
 
@@ -320,23 +347,28 @@ function processQR(itemId) {
 
 async function confirmBorrow() {
   const itemId = window.pendingItemId;
-  // 내가 빌린 내역이 있는지 확인 (반납 처리용)
   const myActive = db.history.find(h => h.itemId === itemId && h.studentId === currentUser.id && !h.returnedAt);
-  
+  const now = new Date().toISOString();
+
   if (myActive) {
-    await fdb.collection("history").doc(myActive.firestoreId).update({ returnedAt: new Date().toISOString() });
+    // 반납 처리 + 자동 점수 계산
+    await fdb.collection("history").doc(myActive.firestoreId).update({ returnedAt: now });
+    const it = db.items.find(i => i.id === itemId);
+    const daysBorrowed = Math.floor((Date.now() - new Date(myActive.borrowedAt)) / 86400000);
+    const maxDays = it?.maxDays || 7;
+    let pts = 10; let reason = '기한 내 반납';
+    if (daysBorrowed > maxDays) { pts = -(daysBorrowed - maxDays) * 5; reason = `${daysBorrowed - maxDays}일 연체 반납`; }
+    else if (daysBorrowed <= maxDays - 2) { pts += 3; reason = '조기 반납 보너스'; }
+    await addPoints(currentUser.id, pts, reason);
   } else {
-    // 대여 가능 수량 재체크
     const it = db.items.find(i => i.id === itemId);
     const st = getItemStatus(it);
     if (st.available > 0) {
       await fdb.collection("history").add({
-        itemId, studentId: currentUser.id, studentName: currentUser.name, 
-        borrowedAt: new Date().toISOString(), returnedAt: null, classCode: currentUser.classCode
+        itemId, studentId: currentUser.id, studentName: currentUser.name,
+        borrowedAt: now, returnedAt: null, classCode: currentUser.classCode
       });
-    } else {
-      alert("그새 품절되었습니다!");
-    }
+    } else { alert("그새 품절되었습니다!"); }
   }
   closeModal('modal-borrow');
 }
@@ -427,11 +459,92 @@ function fmt(iso) { return iso ? iso.split('T')[0] : '-'; }
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
-function toggleGradeField() { /* 더 이상 사용되지 않음 */ }
+function toggleSidebar() { document.querySelector('.admin-layout')?.classList.toggle('sidebar-collapsed'); }
 
-function toggleSidebar() {
-  const layout = document.querySelector('.admin-layout');
-  if (layout) layout.classList.toggle('sidebar-collapsed');
+// ===================== POINT SYSTEM =====================
+function getGrade(pts) {
+  return GRADES.find(g => pts >= g.min) || GRADES[GRADES.length-1];
+}
+
+function getNextGrade(pts) {
+  for (let i = GRADES.length - 1; i >= 0; i--) {
+    if (pts < GRADES[i].min) return GRADES[i];
+  }
+  return null;
+}
+
+async function addPoints(userId, change, reason) {
+  const userRef = fdb.collection("users").doc(userId);
+  const doc = await userRef.get();
+  const data = doc.data();
+  const newPts = (data.points || 0) + change;
+  const newGrade = getGrade(newPts).name;
+  await userRef.update({ points: newPts, grade: newGrade });
+  await fdb.collection("pointHistory").add({
+    userId, change, reason, type: change >= 0 ? 'plus' : 'minus',
+    classCode: data.classCode, timestamp: new Date().toISOString()
+  });
+  if (userId === currentUser?.id) {
+    currentUser.points = newPts;
+    currentUser.grade = newGrade;
+    renderStudentProfile();
+  }
+}
+
+function renderStudentProfile() {
+  const el = document.getElementById('studentProfileCard');
+  if (!el || !currentUser) return;
+  const pts = currentUser.points || 0;
+  const g = getGrade(pts);
+  const next = getNextGrade(pts);
+  const pctText = next ? `다음 등급(${next.icon})까지 ${next.min - pts}점` : '최고 등급 달성!';
+  const pct = next ? Math.min(100, Math.max(0, ((pts - (g.min < 0 ? g.min : 0)) / (next.min - (g.min < 0 ? g.min : 0))) * 100)) : 100;
+  const myHist = db.pointHistory.filter(p => p.userId === currentUser.id).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5);
+  el.innerHTML = `
+    <div class="profile-top">
+      <div class="profile-grade-icon">${g.icon}</div>
+      <div class="profile-info">
+        <div class="profile-name">${currentUser.name}</div>
+        <div class="profile-grade-name" style="color:${g.color}">${g.name} 등급</div>
+      </div>
+      <div class="profile-points"><span>${pts}</span>점</div>
+    </div>
+    <div class="profile-progress-wrap">
+      <div class="profile-progress-bar"><div class="profile-progress-fill" style="width:${pct}%; background:${g.color}"></div></div>
+      <div class="profile-progress-label">${pctText}</div>
+    </div>
+    <div class="profile-history">
+      ${myHist.length ? myHist.map(h => `<div class="ph-row ${h.type}"><span>${h.reason}</span><span class="ph-pts">${h.change > 0 ? '+' : ''}${h.change}점</span></div>`).join('') : '<div class="ph-empty">아직 기록이 없습니다.</div>'}
+    </div>`;
+}
+
+function renderMyPointHistory() {
+  const el = document.getElementById('myPointsList');
+  if (!el) return;
+  const myHist = db.pointHistory.filter(p => p.userId === currentUser.id).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+  el.innerHTML = myHist.length ? myHist.map(h => `<div class="ph-row-full ${h.type}">
+    <div><b>${h.reason}</b><br><small>${fmt(h.timestamp)}</small></div>
+    <span class="ph-pts">${h.change > 0 ? '+' : ''}${h.change}점</span>
+  </div>`).join('') : '<div class="empty-state">포인트 기록이 없습니다.</div>';
+}
+
+function openPointModal(userId, name, pts) {
+  document.getElementById('pointStudentName').textContent = name;
+  document.getElementById('pointCurrentPts').textContent = pts + '점';
+  document.getElementById('pointChange').value = '';
+  document.getElementById('pointReason').value = '';
+  window.pendingPointUserId = userId;
+  openModal('modal-point');
+}
+
+async function submitPointAdjust(e) {
+  e.preventDefault();
+  const change = parseInt(document.getElementById('pointChange').value);
+  const reason = document.getElementById('pointReason').value.trim() || '관리자 조정';
+  if (isNaN(change) || change === 0) { alert('점수를 입력하세요.'); return; }
+  await addPoints(window.pendingPointUserId, change, reason);
+  closeModal('modal-point');
+  renderStudents();
 }
 
 document.addEventListener('DOMContentLoaded', () => { showPage('page-login'); });

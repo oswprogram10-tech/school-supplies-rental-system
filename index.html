@@ -200,10 +200,14 @@
   </nav>
 
   <div class="student-layout">
+    <!-- Student Profile Card -->
+    <div id="studentProfileCard" class="student-profile-card"></div>
+
     <div class="student-tabs">
       <button class="student-tab-btn active" id="stBtn-scan" onclick="studentTab('scan')">📷 QR 스캔</button>
       <button class="student-tab-btn" id="stBtn-myborrow" onclick="studentTab('myborrow')">📋 내 대여</button>
       <button class="student-tab-btn" id="stBtn-catalog" onclick="studentTab('catalog')">📦 비품 목록</button>
+      <button class="student-tab-btn" id="stBtn-mypoints" onclick="studentTab('mypoints')">⭐ 포인트</button>
     </div>
 
     <div id="stTab-scan" class="student-tab-content active">
@@ -228,6 +232,11 @@
 
     <div id="stTab-catalog" class="student-tab-content">
       <div id="catalogGrid" class="items-grid"></div>
+    </div>
+
+    <div id="stTab-mypoints" class="student-tab-content">
+      <div class="page-header"><h2>⭐ 포인트 내역</h2></div>
+      <div id="myPointsList"></div>
     </div>
   </div>
 </div>
@@ -305,6 +314,34 @@
         <button class="btn-primary" onclick="confirmBorrow()">확인</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Point Adjustment Modal (Teacher) -->
+<div id="modal-point" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-point')">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>점수 조정</h3>
+      <button class="modal-close" onclick="closeModal('modal-point')">✕</button>
+    </div>
+    <form onsubmit="submitPointAdjust(event)" class="modal-form">
+      <div style="text-align:center; margin-bottom:16px;">
+        <div style="font-size:18px; font-weight:700;" id="pointStudentName"></div>
+        <div style="color:var(--text2);" id="pointCurrentPts"></div>
+      </div>
+      <div class="form-group">
+        <label>변경 점수 (예: +10 또는 -5)</label>
+        <input type="number" id="pointChange" placeholder="점수를 입력하세요" required />
+      </div>
+      <div class="form-group">
+        <label>사유</label>
+        <input type="text" id="pointReason" placeholder="예: 파손 반납, 봉사활동" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeModal('modal-point')">취소</button>
+        <button type="submit" class="btn-primary">적용</button>
+      </div>
+    </form>
   </div>
 </div>
 
