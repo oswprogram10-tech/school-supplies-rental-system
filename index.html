@@ -119,6 +119,7 @@
 <div id="page-admin" class="page">
   <nav class="navbar">
     <div class="nav-brand">
+      <button id="sidebarToggle" class="btn-icon-nav" onclick="toggleSidebar()">☰</button>
       <span class="nav-logo">📚</span>
       <span class="nav-title">교실 비품 관리</span>
     </div>
@@ -130,10 +131,18 @@
 
   <div class="admin-layout">
     <aside class="sidebar">
-      <button class="sidebar-btn active" id="sideBtn-dashboard" onclick="adminTab('dashboard')">📊 대시보드</button>
-      <button class="sidebar-btn" id="sideBtn-items" onclick="adminTab('items')">📦 비품 관리</button>
-      <button class="sidebar-btn" id="sideBtn-history" onclick="adminTab('history')">📋 대여 이력</button>
-      <button class="sidebar-btn" id="sideBtn-students" onclick="adminTab('students')">👥 학생 현황</button>
+      <button class="sidebar-btn active" id="sideBtn-dashboard" onclick="adminTab('dashboard')">
+        <span>📊</span> <span class="btn-text">대시보드</span>
+      </button>
+      <button class="sidebar-btn" id="sideBtn-items" onclick="adminTab('items')">
+        <span>📦</span> <span class="btn-text">비품 관리</span>
+      </button>
+      <button class="sidebar-btn" id="sideBtn-history" onclick="adminTab('history')">
+        <span>📋</span> <span class="btn-text">대여 이력</span>
+      </button>
+      <button class="sidebar-btn" id="sideBtn-students" onclick="adminTab('students')">
+        <span>👥</span> <span class="btn-text">학생 현황</span>
+      </button>
     </aside>
 
     <main class="admin-main">

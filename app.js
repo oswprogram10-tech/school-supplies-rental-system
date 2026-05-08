@@ -429,4 +429,9 @@ function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
 function toggleGradeField() { /* 더 이상 사용되지 않음 */ }
 
+function toggleSidebar() {
+  const layout = document.querySelector('.admin-layout');
+  if (layout) layout.classList.toggle('sidebar-collapsed');
+}
+
 document.addEventListener('DOMContentLoaded', () => { showPage('page-login'); });
