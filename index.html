@@ -15,8 +15,18 @@
 </head>
 <body>
 
+<!-- ===================== SPLASH SCREEN ===================== -->
+<div id="page-splash" class="page active">
+  <div class="splash-content">
+    <div class="splash-logo">📚</div>
+    <h1 class="splash-title">교실 비품 대여</h1>
+    <p class="splash-subtitle">Smart Rental System</p>
+    <div class="splash-loader"></div>
+  </div>
+</div>
+
 <!-- ===================== LOGIN PAGE ===================== -->
-<div id="page-login" class="page active">
+<div id="page-login" class="page">
   <div class="login-bg">
     <div class="login-orb orb1"></div>
     <div class="login-orb orb2"></div>
@@ -143,6 +153,9 @@
       <button class="sidebar-btn" id="sideBtn-students" onclick="adminTab('students')">
         <span>👥</span> <span class="btn-text">학생 현황</span>
       </button>
+      <button class="sidebar-btn" id="sideBtn-stats" onclick="adminTab('stats')">
+        <span>📈</span> <span class="btn-text">대여 통계</span>
+      </button>
     </aside>
 
     <main class="admin-main">
@@ -184,6 +197,17 @@
       <div id="tab-students" class="tab-content">
         <div class="page-header"><h2>👥 학생 현황</h2></div>
         <div id="studentsList" class="students-grid"></div>
+      </div>
+
+      <!-- Stats -->
+      <div id="tab-stats" class="tab-content">
+        <div class="page-header"><h2>📈 대여 통계</h2></div>
+        <div class="stats-container">
+          <div class="card">
+            <h3>🔥 비품별 인기 순위 (대여 횟수)</h3>
+            <div id="itemStatsList" class="item-stats-list"></div>
+          </div>
+        </div>
       </div>
     </main>
   </div>

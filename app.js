@@ -204,6 +204,7 @@ function adminTab(tab) {
   else if (tab === 'items') renderItems();
   else if (tab === 'history') renderHistory();
   else if (tab === 'students') renderStudents();
+  else if (tab === 'stats') renderStats();
 }
 
 function studentTab(tab) {
@@ -286,6 +287,47 @@ function renderStudents() {
       </div>`;
     }).join('') || '<div class="empty-state">등록된 학생이 없습니다.</div>';
   });
+}
+
+function renderStats() {
+  const list = document.getElementById('itemStatsList');
+  if (!list) return;
+
+  // 1. 대여 횟수 집계
+  const counts = {};
+  db.history.forEach(h => {
+    counts[h.itemId] = (counts[h.itemId] || 0) + 1;
+  });
+
+  // 2. 데이터 가공 및 정렬
+  const stats = Object.entries(counts).map(([id, count]) => {
+    const item = db.items.find(i => i.id === id);
+    return { id, count, name: item ? item.name : id, emoji: item ? (CATEGORY_EMOJI[item.category] || '📦') : '📦' };
+  }).sort((a, b) => b.count - a.count);
+
+  if (stats.length === 0) {
+    list.innerHTML = '<div class="empty-state">통계 데이터가 없습니다.</div>';
+    return;
+  }
+
+  const maxCount = stats[0].count;
+
+  // 3. HTML 생성
+  list.innerHTML = stats.map((s, index) => {
+    const percentage = (s.count / maxCount) * 100;
+    return `
+      <div class="stat-bar-item">
+        <div class="stat-bar-info">
+          <span class="stat-bar-rank">${index + 1}</span>
+          <span class="stat-bar-name">${s.emoji} ${s.name}</span>
+          <span class="stat-bar-count"><b>${s.count}</b>회 대여</span>
+        </div>
+        <div class="stat-bar-bg">
+          <div class="stat-bar-fill" style="width: ${percentage}%;"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderMyBorrow() {
@@ -547,4 +589,9 @@ async function submitPointAdjust(e) {
   renderStudents();
 }
 
-document.addEventListener('DOMContentLoaded', () => { showPage('page-login'); });
+document.addEventListener('DOMContentLoaded', () => {
+  // 스플래시 화면을 2.5초간 보여준 후 로그인 화면으로 이동
+  setTimeout(() => {
+    showPage('page-login');
+  }, 2500);
+});
