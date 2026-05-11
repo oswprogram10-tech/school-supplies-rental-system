@@ -218,7 +218,11 @@ function updateStudentAlerts() {
   myActive.forEach(h => {
     const it = db.items.find(i => i.id === h.itemId);
     const maxDays = it ? (it.maxDays || 7) : 7;
-    const elapsedDays = (Date.now() - new Date(h.borrowedAt).getTime()) / 86400000;
+    
+    // 날짜 차이 계산 (시간 제외)
+    const startDate = new Date(h.borrowedAt.split('T')[0]);
+    const todayDate = new Date(new Date().toISOString().split('T')[0]);
+    const elapsedDays = Math.floor((todayDate - startDate) / 86400000);
     
     if(elapsedDays > maxDays) overdueCount++;
     else if(elapsedDays > maxDays - 1) dueTomorrowCount++;
@@ -582,10 +586,15 @@ async function confirmBorrow() {
       return;
     }
 
-    // 반납 처리 + 자동 점수 계산
+    // 반납 처리
     await fdb.collection("history").doc(myActive.firestoreId).update({ returnedAt: now });
+    
+    // 날짜 차이 계산 (시간 제외)
+    const startDate = new Date(myActive.borrowedAt.split('T')[0]);
+    const todayDate = new Date(now.split('T')[0]);
+    const daysBorrowed = Math.floor((todayDate - startDate) / 86400000);
+    
     const it = db.items.find(i => i.id === itemId);
-    const daysBorrowed = Math.floor((Date.now() - new Date(myActive.borrowedAt)) / 86400000);
     const maxDays = it?.maxDays || 7;
     let pts = 10; let reason = '기한 내 반납';
     if (daysBorrowed > maxDays) { pts = -(daysBorrowed - maxDays) * 5; reason = `${daysBorrowed - maxDays}일 연체 반납`; }
