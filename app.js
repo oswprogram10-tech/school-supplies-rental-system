@@ -772,10 +772,22 @@ function exportHistoryCSV() {
   const rows = [...db.history].sort((a,b)=>new Date(b.borrowedAt)-new Date(a.borrowedAt)).map((h, i) => {
     const itemName = db.items.find(it=>it.id===h.itemId)?.name || h.itemId;
     const status = h.returnedAt ? '반납완료' : '대여중';
-    return [i+1, h.studentName, h.studentId, itemName, fmt(h.borrowedAt), fmt(h.returnedAt), status];
+    const bDate = h.borrowedAt ? h.borrowedAt.split('T')[0] : '-';
+    const rDate = h.returnedAt ? h.returnedAt.split('T')[0] : '미반납';
+    
+    // 각 필드를 따옴표로 감싸 쉼표나 특수문자로 인한 오류 방지
+    return [
+      `"${i+1}"`,
+      `"${h.studentName}"`,
+      `"${h.studentId}"`,
+      `"${itemName.replace(/"/g, '""')}"`,
+      `"${bDate}"`,
+      `"${rDate}"`,
+      `"${status}"`
+    ];
   });
   
-  let csvContent = "\uFEFF" + headers.join(",") + "\n"; // \uFEFF ensures UTF-8 BOM for Excel
+  let csvContent = "\uFEFF" + headers.join(",") + "\n"; 
   rows.forEach(row => {
     csvContent += row.join(",") + "\n";
   });
