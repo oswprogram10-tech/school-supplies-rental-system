@@ -313,7 +313,7 @@ function adminTab(tab) {
   else if (tab === 'history') renderHistory();
   else if (tab === 'students') renderStudents();
   else if (tab === 'approvals') renderApprovals();
-  else if (tab === 'stats') renderStats();
+  else if (tab === 'stats') { /* CSV 내보내기 탭은 렌더링 함수 필요 없음 */ }
 }
 
 function studentTab(tab) {
@@ -331,27 +331,80 @@ function studentTab(tab) {
 }
 
 function renderDashboard() {
-  const borrowed = db.history.filter(h => !h.returnedAt).length;
-  document.getElementById('statTotalItems').textContent = db.items.length;
-  document.getElementById('statBorrowed').textContent = borrowed;
-  document.getElementById('statAvailable').textContent = db.items.length - borrowed;
+  const activeHistory = db.history.filter(h => !h.returnedAt);
+  const totalItems = db.items.length;
+  const borrowedCount = activeHistory.reduce((sum, h) => sum + (h.quantity || 1), 0);
+  const totalQuantity = db.items.reduce((sum, it) => sum + (it.totalQuantity || 1), 0);
   
-  const list = document.getElementById('currentBorrowList');
-  const active = db.history.filter(h => !h.returnedAt);
-  list.innerHTML = active.length ? active.map(h => {
-    const it = db.items.find(i => i.id === h.itemId);
-    const qtyText = h.quantity > 1 ? ` (x${h.quantity})` : '';
-    return `<div class="borrow-item">${it?.name || '정보없음'}${qtyText} (${h.studentName})</div>`;
-  }).join('') : '대여 중인 비품 없음';
+  document.getElementById('statTotalItems').textContent = totalItems;
+  document.getElementById('statBorrowed').textContent = borrowedCount;
+  document.getElementById('statAvailable').textContent = totalQuantity - borrowedCount;
+  
+  // 1. 비품 인기 순위 차트 (TOP 5)
+  const counts = {};
+  db.history.forEach(h => counts[h.itemId] = (counts[h.itemId] || 0) + (h.quantity || 1));
+  const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+  const max = sorted.length ? sorted[0][1] : 1;
+  
+  const chartHtml = sorted.map(([id, count]) => {
+    const it = db.items.find(i => i.id === id);
+    const name = it ? it.name : id;
+    const width = (count / max) * 100;
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+          <span>${name}</span><span>${count}회</span>
+        </div>
+        <div style="height:8px; background:var(--bg2); border-radius:4px; overflow:hidden;">
+          <div style="height:100%; width:${width}%; background:var(--accent); transition:width 0.5s;"></div>
+        </div>
+      </div>`;
+  }).join('') || '<div style="color:var(--text3); font-size:12px;">데이터가 없습니다.</div>';
+  document.getElementById('dashboardStatsChart').innerHTML = chartHtml;
 
-  const reportsHtml = db.reports.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,5).map(r => `
-    <div style="background:var(--card2); padding:10px; border-radius:8px; margin-bottom:8px; border-left:4px solid var(--red);">
-      <div style="font-weight:600; font-size:13px;">[${r.itemName}] ${r.studentName}</div>
-      <div style="font-size:13px; color:var(--text); margin-top:4px;">${r.content}</div>
-      <div style="font-size:11px; color:var(--text2); margin-top:4px;">${fmt(r.timestamp)}</div>
+  // 2. 비품 재고 상태 리스트
+  const inventoryHtml = db.items.map(it => {
+    const st = getItemStatus(it);
+    const color = st.available === 0 ? 'var(--red)' : (st.available < 3 ? 'var(--yellow)' : 'var(--green)');
+    return `
+      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--bg2); font-size:13px;">
+        <span>${it.name}</span>
+        <span style="color:${color}; font-weight:600;">${st.available} / ${st.total}</span>
+      </div>`;
+  }).join('');
+  document.getElementById('dashboardInventoryList').innerHTML = inventoryHtml || '등록된 비품 없음';
+
+  // 3. 학생 포인트 랭킹 (TOP 5)
+  const rankedStudents = [...db.users].filter(u => u.role === 'student')
+                                    .sort((a,b) => (b.points || 0) - (a.points || 0))
+                                    .slice(0, 5);
+  const rankingHtml = rankedStudents.map((u, i) => `
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+      <div style="width:24px; height:24px; background:var(--accent2); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">${i+1}</div>
+      <div style="flex:1; font-size:13px;">${u.name} <span style="color:var(--text3); font-size:11px;">(${u.grade})</span></div>
+      <div style="font-weight:600; font-size:13px; color:var(--accent2);">${u.points || 0}P</div>
     </div>
   `).join('');
-  document.getElementById('adminReportList').innerHTML = reportsHtml || '<div style="color:var(--text2); font-size:13px;">최근 신고 내역이 없습니다.</div>';
+  document.getElementById('dashboardStudentRanking').innerHTML = rankingHtml || '학생 데이터 없음';
+
+  // 4. 실시간 대여 현황
+  const list = document.getElementById('currentBorrowList');
+  list.innerHTML = activeHistory.length ? activeHistory.map(h => {
+    const it = db.items.find(i => i.id === h.itemId);
+    const qtyText = h.quantity > 1 ? ` x${h.quantity}` : '';
+    return `<div style="font-size:13px; padding:6px 0; border-bottom:1px solid var(--bg2);">
+      <b>${h.studentName}</b>: ${it?.name || '정보없음'}${qtyText}
+    </div>`;
+  }).join('') : '<div style="color:var(--text3); font-size:12px;">대여 중인 비품 없음</div>';
+
+  // 5. 최근 신고 내역
+  const reportsHtml = db.reports.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,3).map(r => `
+    <div style="background:var(--card2); padding:8px; border-radius:8px; margin-bottom:8px; border-left:4px solid var(--red);">
+      <div style="font-weight:600; font-size:12px;">[${r.itemName}] ${r.studentName}</div>
+      <div style="font-size:12px; color:var(--text); margin-top:2px;">${r.content}</div>
+    </div>
+  `).join('');
+  document.getElementById('adminReportList').innerHTML = reportsHtml || '<div style="color:var(--text3); font-size:12px;">신고 내역 없음</div>';
 }
 
 function renderItems() {
@@ -437,46 +490,7 @@ function renderStudents() {
   });
 }
 
-function renderStats() {
-  const list = document.getElementById('itemStatsList');
-  if (!list) return;
 
-  // 1. 대여 횟수 집계
-  const counts = {};
-  db.history.forEach(h => {
-    counts[h.itemId] = (counts[h.itemId] || 0) + 1;
-  });
-
-  // 2. 데이터 가공 및 정렬
-  const stats = Object.entries(counts).map(([id, count]) => {
-    const item = db.items.find(i => i.id === id);
-    return { id, count, name: item ? item.name : id, emoji: item ? (CATEGORY_EMOJI[item.category] || '📦') : '📦' };
-  }).sort((a, b) => b.count - a.count);
-
-  if (stats.length === 0) {
-    list.innerHTML = '<div class="empty-state">통계 데이터가 없습니다.</div>';
-    return;
-  }
-
-  const maxCount = stats[0].count;
-
-  // 3. HTML 생성
-  list.innerHTML = stats.map((s, index) => {
-    const percentage = (s.count / maxCount) * 100;
-    return `
-      <div class="stat-bar-item">
-        <div class="stat-bar-info">
-          <span class="stat-bar-rank">${index + 1}</span>
-          <span class="stat-bar-name">${s.emoji} ${s.name}</span>
-          <span class="stat-bar-count"><b>${s.count}</b>회 대여</span>
-        </div>
-        <div class="stat-bar-bg">
-          <div class="stat-bar-fill" style="width: ${percentage}%;"></div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
 
 function renderMyBorrow() {
   const active = db.history.filter(h => h.studentId === currentUser.id && !h.returnedAt);

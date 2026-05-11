@@ -173,18 +173,41 @@
       <!-- Dashboard -->
       <div id="tab-dashboard" class="tab-content active">
         <div class="page-header"><h2>📊 대시보드</h2></div>
-        <div class="stats-grid">
-          <div class="stat-card" style="--accent:#6366f1"><div class="stat-value" id="statTotalItems">0</div><div class="stat-label">총 비품</div></div>
-          <div class="stat-card" style="--accent:#f59e0b"><div class="stat-value" id="statBorrowed">0</div><div class="stat-label">대여 중</div></div>
-          <div class="stat-card" style="--accent:#10b981"><div class="stat-value" id="statAvailable">0</div><div class="stat-label">대여 가능</div></div>
+        
+        <div class="stats-overview">
+          <div class="stat-card"><h3>전체 비품</h3><p id="statTotalItems">0</p></div>
+          <div class="stat-card"><h3>대여 중</h3><p id="statBorrowed">0</p></div>
+          <div class="stat-card"><h3>대여 가능</h3><p id="statAvailable">0</p></div>
         </div>
-        <div class="card" style="margin-top:20px;">
-          <h3>🔄 현재 대여 현황</h3>
-          <div id="currentBorrowList" class="borrow-list"></div>
-        </div>
-        <div class="card" style="margin-top:20px; border-color:var(--red);">
-          <h3 style="color:var(--red);">🚨 최근 비품 신고 내역</h3>
-          <div id="adminReportList" class="borrow-list"></div>
+        
+        <div class="dashboard-grid" style="display:grid; grid-template-columns: 2fr 1fr; gap:20px;">
+          <!-- 왼쪽 열: 통계 및 재고 -->
+          <div class="dashboard-column">
+            <div class="dashboard-card">
+              <h3>📊 비품별 인기 순위</h3>
+              <div id="dashboardStatsChart" class="stats-chart-container" style="height:200px;"></div>
+            </div>
+            <div class="dashboard-card" style="margin-top:20px;">
+              <h3>📦 비품 재고 상태 (잔여/전체)</h3>
+              <div id="dashboardInventoryList" class="inventory-list"></div>
+            </div>
+          </div>
+          
+          <!-- 오른쪽 열: 학생 정보 및 신고 -->
+          <div class="dashboard-column">
+            <div class="dashboard-card">
+              <h3>🏆 학생 포인트 랭킹</h3>
+              <div id="dashboardStudentRanking"></div>
+            </div>
+            <div class="dashboard-card" style="margin-top:20px;">
+              <h3>🤝 실시간 대여 현황</h3>
+              <div id="currentBorrowList" class="borrow-list-compact"></div>
+            </div>
+            <div class="dashboard-card" style="margin-top:20px;">
+              <h3>🚨 최근 신고 내역</h3>
+              <div id="adminReportList"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -241,13 +264,12 @@
 
       <!-- Stats -->
       <div id="tab-stats" class="tab-content">
-        <div class="page-header"><h2>📈 대여 통계</h2></div>
-        <div class="stats-container">
-          <div class="card">
-            <h3>🔥 비품별 인기 순위 (대여 횟수)</h3>
-            <div id="itemStatsList" class="item-stats-list"></div>
-          </div>
-        </div>
+      <div class="page-header"><h2>📊 데이터 내보내기</h2></div>
+      <div class="dashboard-card">
+        <p style="margin-bottom:20px; color:var(--text2); font-size:14px;">대여 및 반납 전체 이력을 CSV 파일로 저장하여 관리할 수 있습니다.</p>
+        <button class="btn-primary" onclick="exportHistoryCSV()" style="width:100%;">이력 데이터 (CSV) 내보내기</button>
+      </div>
+    </div>
       </div>
     </main>
   </div>
