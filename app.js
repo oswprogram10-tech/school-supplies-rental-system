@@ -369,8 +369,8 @@ function renderItems() {
       <div class="item-status-badge status-${st.css}">${st.available} / ${st.total} 남음</div>
       <div class="item-card-actions">
         <button class="btn-icon" onclick="showQR('${it.id}')">🔍 QR</button>
-        <button class="btn-icon" onclick="openEditItem('${it.id}')">✏️ 수정</button>
-        <button class="btn-danger" onclick="deleteItem('${it.id}')">🗑️ 삭제</button>
+        <button class="btn-icon" onclick="openEditItem('${it.firestoreId}')">✏️ 수정</button>
+        <button class="btn-danger" onclick="deleteItem('${it.firestoreId}')">🗑️ 삭제</button>
       </div>
     </div>`;
   }).join('');
@@ -649,10 +649,10 @@ function openAddItemModal() {
   openModal('modal-item');
 }
 
-function openEditItem(id) {
-  const it = db.items.find(i => i.id === id);
+function openEditItem(firestoreId) {
+  const it = db.items.find(i => i.firestoreId === firestoreId);
   document.getElementById('modalItemTitle').textContent = '비품 수정';
-  document.getElementById('editItemId').value = id;
+  document.getElementById('editItemId').value = firestoreId;
   document.getElementById('itemName').value = it.name;
   document.getElementById('itemCategory').value = it.category;
   document.getElementById('itemStatus').value = it.status || '정상';
@@ -680,8 +680,8 @@ async function saveItem(e) {
   closeModal('modal-item');
 }
 
-async function deleteItem(id) {
-  if (confirm('삭제하시겠습니까?')) await fdb.collection("items").doc(id).delete();
+async function deleteItem(firestoreId) {
+  if (confirm('삭제하시겠습니까?')) await fdb.collection("items").doc(firestoreId).delete();
 }
 
 function getItemStatus(it) {
