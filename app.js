@@ -336,7 +336,8 @@ function renderDashboard() {
   const active = db.history.filter(h => !h.returnedAt);
   list.innerHTML = active.length ? active.map(h => {
     const it = db.items.find(i => i.id === h.itemId);
-    return `<div class="borrow-item">${it?.name || '정보없음'} (${h.studentName})</div>`;
+    const qtyText = h.quantity > 1 ? ` (x${h.quantity})` : '';
+    return `<div class="borrow-item">${it?.name || '정보없음'}${qtyText} (${h.studentName})</div>`;
   }).join('') : '대여 중인 비품 없음';
 
   const reportsHtml = db.reports.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,5).map(r => `
@@ -475,16 +476,19 @@ function renderStats() {
 
 function renderMyBorrow() {
   const active = db.history.filter(h => h.studentId === currentUser.id && !h.returnedAt);
-  document.getElementById('myBorrowList').innerHTML = active.map(h => `<div class="my-borrow-card" style="display:flex; justify-content:space-between; align-items:center;">
+  document.getElementById('myBorrowList').innerHTML = active.map(h => {
+    const itemName = db.items.find(i=>i.id===h.itemId)?.name || h.itemId;
+    const qtyText = h.quantity > 1 ? ` (x${h.quantity})` : '';
+    return `<div class="my-borrow-card" style="display:flex; justify-content:space-between; align-items:center;">
     <div>
-      <b>${db.items.find(i=>i.id===h.itemId)?.name || h.itemId}</b><br>
+      <b>${itemName}${qtyText}</b><br>
       <span style="font-size:12px; color:var(--text2);">대여일: ${fmt(h.borrowedAt)}</span>
     </div>
     <div style="display:flex; gap:8px;">
       <button class="btn-report" onclick="openReportModal('${h.itemId}')">🚨 신고</button>
       <button class="btn-secondary" onclick="processQR('${h.itemId}')">반납</button>
     </div>
-  </div>`).join('');
+  </div>`}).join('');
   updateStudentAlerts();
 }
 
@@ -524,8 +528,11 @@ function processQR(itemId) {
   document.getElementById('borrowItemName').textContent = it.name;
   
   const btnConfirm = document.getElementById('btnBorrowConfirm');
+  const qtyWrapper = document.getElementById('borrowQtyWrapper');
+  
   if (myActive) {
     document.getElementById('borrowConfirmMsg').textContent = '이 비품을 반납하시겠습니까?';
+    if(qtyWrapper) qtyWrapper.style.display = 'none';
     if(btnConfirm) {
       btnConfirm.textContent = '확인';
       btnConfirm.setAttribute('onclick', 'confirmBorrow()');
@@ -533,12 +540,20 @@ function processQR(itemId) {
   } else {
     if (st.available <= 0) {
       document.getElementById('borrowConfirmMsg').textContent = `현재 모두 대여 중입니다. 반납 시 알림을 받으시겠습니까?`;
+      if(qtyWrapper) qtyWrapper.style.display = 'none';
       if(btnConfirm) {
         btnConfirm.textContent = '대기 신청';
         btnConfirm.setAttribute('onclick', 'confirmWaitlist()');
       }
     } else {
       document.getElementById('borrowConfirmMsg').textContent = `이 비품을 대여하시겠습니까? (현재 ${st.available}개 남음)`;
+      if(qtyWrapper) {
+        qtyWrapper.style.display = 'block';
+        const qtyInput = document.getElementById('borrowQuantity');
+        qtyInput.max = st.available;
+        qtyInput.value = 1;
+        document.getElementById('maxQtyLabel').textContent = `(최대 ${st.available}개)`;
+      }
       if(btnConfirm) {
         btnConfirm.textContent = '확인';
         btnConfirm.setAttribute('onclick', 'confirmBorrow()');
@@ -579,15 +594,18 @@ async function confirmBorrow() {
   } else {
     const it = db.items.find(i => i.id === itemId);
     const st = getItemStatus(it);
-    if (st.available > 0) {
+    const borrowQty = parseInt(document.getElementById('borrowQuantity').value) || 1;
+
+    if (st.available >= borrowQty) {
       await fdb.collection("history").add({
         itemId, studentId: currentUser.id, studentName: currentUser.name,
-        borrowedAt: now, returnedAt: null, classCode: currentUser.classCode
+        borrowedAt: now, returnedAt: null, classCode: currentUser.classCode,
+        quantity: borrowQty
       });
       // 대기 명단에서 제거
       const wList = db.waitlists?.find(w => w.itemId === itemId && w.studentId === currentUser.id);
       if (wList) await fdb.collection("waitlists").doc(wList.firestoreId).delete();
-    } else { alert("그새 품절되었습니다!"); }
+    } else { alert("그새 수량이 부족해졌습니다!"); }
   }
   closeModal('modal-borrow');
 }
@@ -685,7 +703,8 @@ async function deleteItem(firestoreId) {
 }
 
 function getItemStatus(it) {
-  const activeCount = db.history.filter(h => h.itemId === it.id && !h.returnedAt).length;
+  const activeCount = db.history.filter(h => h.itemId === it.id && !h.returnedAt)
+                                .reduce((sum, h) => sum + (h.quantity || 1), 0);
   const total = it.totalQuantity || 1;
   const available = total - activeCount;
   return { 
