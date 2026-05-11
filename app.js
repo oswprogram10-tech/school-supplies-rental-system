@@ -27,6 +27,8 @@ let selectedRole = 'teacher';
 let activeListeners = [];
 let hasCheckedOverdue = false;
 let scannerInstance = null;
+let logoutTimer = null;
+const IDLE_TIME = 15 * 60 * 1000; // 15분 (밀리초)
 
 // ===================== AUTH & NAVIGATION =====================
 function selectRole(role) {
@@ -64,6 +66,7 @@ async function handleLogin(e) {
         initRealtimeSync(userData.classCode);
         if (userData.role === 'teacher') showAdmin();
         else showStudent();
+        resetLogoutTimer();
         return;
       }
     }
@@ -119,11 +122,27 @@ async function handleFindAuth(e) {
 }
 
 function logout() {
+  if (logoutTimer) clearTimeout(logoutTimer);
   activeListeners.forEach(unsub => unsub());
   stopScan();
   currentUser = null;
   showPage('page-login');
 }
+
+function resetLogoutTimer() {
+  if (logoutTimer) clearTimeout(logoutTimer);
+  if (currentUser) {
+    logoutTimer = setTimeout(() => {
+      alert("15분 동안 활동이 없어 보안을 위해 자동 로그아웃되었습니다.");
+      logout();
+    }, IDLE_TIME);
+  }
+}
+
+// 모든 주요 활동(클릭, 키보드, 스크롤 등) 감지하여 타이머 리셋
+['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(name => {
+  document.addEventListener(name, resetLogoutTimer, true);
+});
 
 async function toggleSignupClassInput() {
   const role = document.getElementById('signupRole').value;
