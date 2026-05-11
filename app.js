@@ -22,7 +22,7 @@ fdb.collection("config").doc("app").onSnapshot(doc => {
   }
 });
 
-const APP_VERSION = "Tokyo";
+const APP_VERSION = "Paris";
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
@@ -98,6 +98,16 @@ async function handleSignUp(e) {
   const name = document.getElementById('signupName').value.trim();
 
   try {
+    if (role === 'teacher') {
+      const inputKey = document.getElementById('signupTeacherKey').value;
+      const configDoc = await fdb.collection("config").doc("app").get();
+      const secretKey = configDoc.data().teacherKey || "2024teacher"; 
+      if (inputKey !== secretKey) {
+        alert("교사 인증 코드가 올바르지 않습니다. 관리자에게 문의하세요.");
+        return;
+      }
+    }
+
     const checkDoc = await fdb.collection("users").doc(id).get();
     if (checkDoc.exists) { alert("이미 존재하는 아이디입니다."); return; }
 
@@ -160,10 +170,13 @@ function resetLogoutTimer() {
 async function toggleSignupClassInput() {
   const role = document.getElementById('signupRole').value;
   const wrapper = document.getElementById('signupClassCodeWrapper');
+  const keyWrapper = document.getElementById('teacherKeyWrapper');
   
   if (role === 'teacher') {
     wrapper.innerHTML = `<input type="text" id="signupClassCode" placeholder="예: 3-2 (새로운 코드 생성)" required />`;
+    if(keyWrapper) keyWrapper.classList.remove('hidden');
   } else {
+    if(keyWrapper) keyWrapper.classList.add('hidden');
     wrapper.innerHTML = `<select id="signupClassCode" required><option value="">학급 정보를 불러오는 중...</option></select>`;
     try {
       const snap = await fdb.collection("users").where("role", "==", "teacher").get();
