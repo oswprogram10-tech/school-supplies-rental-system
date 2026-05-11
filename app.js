@@ -21,7 +21,7 @@ const GRADES = [
   { name:'Banned', icon:'🚫', min:-Infinity, color:'#7f1d1d', maxBorrow: 0 }
 ];
 
-let db = { items: [], history: [], pointHistory: [], reports: [], waitlists: [] };
+let db = { users: [], items: [], history: [], pointHistory: [], reports: [], waitlists: [] };
 let currentUser = null;
 let selectedRole = 'teacher';
 let activeListeners = [];
@@ -198,7 +198,13 @@ function initRealtimeSync(classCode) {
     if (currentUser && currentUser.role === 'student') updateStudentAlerts();
   });
 
-  activeListeners.push(itemsUnsub, historyUnsub, pointUnsub, reportsUnsub, waitlistsUnsub);
+  const usersUnsub = fdb.collection("users").where("classCode", "==", classCode)
+    .onSnapshot(snap => {
+      db.users = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      refreshCurrentUI();
+    });
+
+  activeListeners.push(itemsUnsub, historyUnsub, pointUnsub, reportsUnsub, waitlistsUnsub, usersUnsub);
 }
 
 function checkOverdueAlert() {
@@ -375,7 +381,8 @@ function renderDashboard() {
   document.getElementById('dashboardInventoryList').innerHTML = inventoryHtml || '등록된 비품 없음';
 
   // 3. 학생 포인트 랭킹 (TOP 5) - 승인된 학생만
-  const rankedStudents = [...db.users].filter(u => u.role === 'student' && (u.status === 'approved' || !u.status))
+  const allUsers = db.users || [];
+  const rankedStudents = [...allUsers].filter(u => u.role === 'student' && (u.status === 'approved' || !u.status))
                                     .sort((a,b) => (b.points || 0) - (a.points || 0))
                                     .slice(0, 5);
   const rankingHtml = rankedStudents.map((u, i) => `
