@@ -11,6 +11,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const fdb = firebase.firestore();
 
+// 앱 버전 자동 업데이트 체크
+fdb.collection("config").doc("app").onSnapshot(doc => {
+  if (doc.exists) {
+    const remoteVersion = doc.data().version;
+    if (remoteVersion && remoteVersion !== APP_VERSION) {
+      console.log(`새로운 버전 발견: ${remoteVersion}. 현재 버전(${APP_VERSION})에서 업데이트를 위해 새로고침합니다.`);
+      setTimeout(() => location.reload(), 1500); 
+    }
+  }
+});
+
+const APP_VERSION = "Tokyo";
+
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
 const GRADES = [
