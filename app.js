@@ -374,8 +374,8 @@ function renderDashboard() {
   }).join('');
   document.getElementById('dashboardInventoryList').innerHTML = inventoryHtml || '등록된 비품 없음';
 
-  // 3. 학생 포인트 랭킹 (TOP 5)
-  const rankedStudents = [...db.users].filter(u => u.role === 'student')
+  // 3. 학생 포인트 랭킹 (TOP 5) - 승인된 학생만
+  const rankedStudents = [...db.users].filter(u => u.role === 'student' && (u.status === 'approved' || !u.status))
                                     .sort((a,b) => (b.points || 0) - (a.points || 0))
                                     .slice(0, 5);
   const rankingHtml = rankedStudents.map((u, i) => `
@@ -465,29 +465,31 @@ function renderHistory() {
 
 function renderStudents() {
   const list = document.getElementById('studentsList');
-  fdb.collection("users").where("classCode", "==", currentUser.classCode).where("role", "==", "student").where("status", "==", "approved").get().then(snap => {
-    const students = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.points||0) - (a.points||0));
-    
-    const top3 = students.slice(0, 3).filter(s => (s.points || 0) > 0);
-    const topHtml = top3.length > 0 ? `<div style="background:linear-gradient(135deg, #fffbeb, #fef3c7); border:1px solid #fde68a; border-radius:12px; padding:16px; margin-bottom:20px; color:#92400e;">
-      <h3 style="margin-bottom:10px; font-size:16px;">🏆 이달의 우수 학생</h3>
-      <div style="display:flex; gap:12px; font-size:14px; flex-wrap:wrap;">
-        ${top3.map((s, i) => `<div style="background:#fff; padding:4px 10px; border-radius:20px;"><b>${i+1}위</b> ${s.name}(${s.points||0}점)</div>`).join('')}
-      </div>
-    </div>` : '';
+  if (!list || !db.users) return;
 
-    list.innerHTML = topHtml + students.map((s, i) => {
-      const g = getGrade(s.points||0);
-      return `<div class="student-card-v2">
-        <div class="sc-rank">${i+1}</div>
-        <div class="sc-info">
-          <div class="sc-name">${g.icon} ${s.name}</div>
-          <div class="sc-meta">${s.id} · ${g.name} · <b>${s.points||0}점</b></div>
-        </div>
-        <button class="btn-icon" onclick="openPointModal('${s.id}','${s.name}',${s.points||0})">±점수</button>
-      </div>`;
-    }).join('') || '<div class="empty-state">등록된 학생이 없습니다.</div>';
-  });
+  // 승인된 학생 또는 상태 필드가 없는 학생(초기 가입자) 필터링
+  const students = db.users.filter(u => u.role === 'student' && (u.status === 'approved' || !u.status))
+                           .sort((a,b) => (b.points||0) - (a.points||0));
+  
+  const top3 = students.slice(0, 3).filter(s => (s.points || 0) > 0);
+  const topHtml = top3.length > 0 ? `<div style="background:linear-gradient(135deg, #fffbeb, #fef3c7); border:1px solid #fde68a; border-radius:12px; padding:16px; margin-bottom:20px; color:#92400e;">
+    <h3 style="margin-bottom:10px; font-size:16px;">🏆 이달의 우수 학생</h3>
+    <div style="display:flex; gap:12px; font-size:14px; flex-wrap:wrap;">
+      ${top3.map((s, i) => `<div style="background:#fff; padding:4px 10px; border-radius:20px;"><b>${i+1}위</b> ${s.name}(${s.points||0}점)</div>`).join('')}
+    </div>
+  </div>` : '';
+
+  list.innerHTML = topHtml + students.map((s, i) => {
+    const g = getGrade(s.points||0);
+    return `<div class="student-card-v2">
+      <div class="sc-rank">${i+1}</div>
+      <div class="sc-info">
+        <div class="sc-name">${g.icon} ${s.name}</div>
+        <div class="sc-meta">${s.id} · ${g.name} · <b>${s.points||0}점</b></div>
+      </div>
+      <button class="btn-icon" onclick="openPointModal('${s.id}','${s.name}',${s.points||0})">±점수</button>
+    </div>`;
+  }).join('') || '<div class="empty-state">승인된 학생이 없습니다. [승인 관리] 탭을 확인해 보세요.</div>';
 }
 
 
