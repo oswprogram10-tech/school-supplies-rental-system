@@ -22,7 +22,7 @@ fdb.collection("config").doc("app").onSnapshot(doc => {
   }
 });
 
-const APP_VERSION = "Dublin";
+const APP_VERSION = "Edinburgh";
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };

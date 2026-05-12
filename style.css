@@ -52,6 +52,7 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  word-break: keep-all;
 }
 body::before {
   content: '';
@@ -449,8 +450,13 @@ body > * { position: relative; z-index: 1; }
 }
 @media (max-width: 480px) {
   .items-grid { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
+  .stats-overview-row { gap: 10px; }
+  .stat-mini-card { padding: 12px 14px; min-width: calc(50% - 10px); }
+  .mini-value { font-size: 18px; }
+  .page-header h2 { font-size: 20px; }
+  .login-card { padding: 30px 20px; }
 }
 
 @media print {
