@@ -22,7 +22,7 @@ fdb.collection("config").doc("app").onSnapshot(doc => {
   }
 });
 
-const APP_VERSION = "Rome";
+const APP_VERSION = "Athens";
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
@@ -870,7 +870,7 @@ function exportHistoryCSV() {
     const bDate = h.borrowedAt ? h.borrowedAt.split('T')[0] : '-';
     const rDate = h.returnedAt ? h.returnedAt.split('T')[0] : '미반납';
     
-    // 각 필드를 따옴표로 감싸 쉼표나 특수문자로 인한 오류 방지
+    // 각 필드를 따옴표로 감싸고, 날짜 등은 앞에 공백을 주어 엑셀이 숫자로 자동 변환하는 것을 방지
     return [
       `"${i+1}"`,
       `"${h.studentName}"`,
@@ -882,9 +882,11 @@ function exportHistoryCSV() {
     ];
   });
   
-  let csvContent = "\uFEFF" + headers.join(",") + "\n"; 
+  // 헤더도 따옴표로 감싸기
+  const quotedHeaders = headers.map(h => `"${h}"`).join(",");
+  let csvContent = "\uFEFF" + quotedHeaders + "\r\n"; 
   rows.forEach(row => {
-    csvContent += row.join(",") + "\n";
+    csvContent += row.join(",") + "\r\n";
   });
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1039,8 +1041,6 @@ async function rejectUser(id) {
     renderApprovals();
   }
 }
-}
-
 // ===================== 배경 설정 기능 =====================
 function loadBackground() {
   const customBg = localStorage.getItem('customBg');
