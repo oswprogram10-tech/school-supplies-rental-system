@@ -271,12 +271,13 @@ body > * { position: relative; z-index: 1; }
 .page-desc { color: var(--text2); font-size: 14px; margin-top: 4px; }
 
 /* STATS */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.stat-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; gap: 16px; transition: transform 0.2s; border-left: 4px solid var(--accent); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: var(--shadow-sm); }
-.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-.stat-icon { font-size: 32px; }
-.stat-value { font-size: 28px; font-weight: 800; color: var(--accent2); }
-.stat-label { font-size: 13px; color: var(--text2); font-weight: 500; }
+.stats-overview-row { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+.stat-mini-card { flex: 1; min-width: 120px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px 18px; display: flex; align-items: center; gap: 14px; backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: var(--shadow-sm); transition: transform 0.2s; }
+.stat-mini-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--accent); }
+.mini-icon { font-size: 24px; background: rgba(255,255,255,0.05); width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--glass-border); }
+.mini-content { display: flex; flex-direction: column; }
+.mini-label { font-size: 11px; color: var(--text2); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.mini-value { font-size: 20px; font-weight: 800; color: var(--text); }
 
 /* CARDS */
 .card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }

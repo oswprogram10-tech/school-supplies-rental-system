@@ -22,7 +22,7 @@ fdb.collection("config").doc("app").onSnapshot(doc => {
   }
 });
 
-const APP_VERSION = "London";
+const APP_VERSION = "Berlin";
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
@@ -42,6 +42,8 @@ let hasCheckedOverdue = false;
 let scannerInstance = null;
 let logoutTimer = null;
 const IDLE_TIME = 15 * 60 * 1000; // 15분 (밀리초)
+let popularPieChartInstance = null;
+let inventoryBarChartInstance = null;
 
 // ===================== AUTH & NAVIGATION =====================
 function selectRole(role) {
@@ -391,39 +393,87 @@ function renderDashboard() {
   document.getElementById('statBorrowed').textContent = borrowedCount;
   document.getElementById('statAvailable').textContent = totalQuantity - borrowedCount;
   
-  // 1. 비품 인기 순위 차트 (TOP 5)
+  // 1. 비품 인기 순위 차트 (원형 그래프 - TOP 5)
   const counts = {};
   db.history.forEach(h => counts[h.itemId] = (counts[h.itemId] || 0) + (h.quantity || 1));
   const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
-  const max = sorted.length ? sorted[0][1] : 1;
   
-  const chartHtml = sorted.map(([id, count]) => {
-    const it = db.items.find(i => i.id === id);
-    const name = it ? it.name : id;
-    const width = (count / max) * 100;
-    return `
-      <div style="margin-bottom:10px;">
-        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-          <span>${name}</span><span>${count}회</span>
-        </div>
-        <div style="height:8px; background:var(--bg2); border-radius:4px; overflow:hidden;">
-          <div style="height:100%; width:${width}%; background:var(--accent); transition:width 0.5s;"></div>
-        </div>
-      </div>`;
-  }).join('') || '<div style="color:var(--text3); font-size:12px;">데이터가 없습니다.</div>';
-  document.getElementById('dashboardStatsChart').innerHTML = chartHtml;
+  const pieLabels = sorted.map(([id]) => db.items.find(i => i.id === id)?.name || id);
+  const pieData = sorted.map(([, count]) => count);
 
-  // 2. 비품 재고 상태 리스트
-  const inventoryHtml = db.items.map(it => {
-    const st = getItemStatus(it);
-    const color = st.available === 0 ? 'var(--red)' : (st.available < 3 ? 'var(--yellow)' : 'var(--green)');
-    return `
-      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--bg2); font-size:13px;">
-        <span>${it.name}</span>
-        <span style="color:${color}; font-weight:600;">${st.available} / ${st.total}</span>
-      </div>`;
-  }).join('');
-  document.getElementById('dashboardInventoryList').innerHTML = inventoryHtml || '등록된 비품 없음';
+  if (popularPieChartInstance) popularPieChartInstance.destroy();
+  const pieCtx = document.getElementById('popularPieChart');
+  if (pieCtx) {
+    popularPieChartInstance = new Chart(pieCtx.getContext('2d'), {
+      type: 'pie',
+      data: {
+        labels: pieLabels,
+        datasets: [{
+          data: pieData,
+          backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#e2e8f0', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // 2. 비품 재고 상태 (막대 그래프)
+  const invLabels = db.items.map(it => it.name);
+  const invData = db.items.map(it => getItemStatus(it).available);
+  const invTotal = db.items.map(it => it.totalQuantity || 1);
+
+  if (inventoryBarChartInstance) inventoryBarChartInstance.destroy();
+  const barCtx = document.getElementById('inventoryBarChart');
+  if (barCtx) {
+    inventoryBarChartInstance = new Chart(barCtx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: invLabels,
+        datasets: [
+          {
+            label: '잔여 수량',
+            data: invData,
+            backgroundColor: '#818cf8',
+            borderRadius: 4
+          },
+          {
+            label: '전체 수량',
+            data: invTotal,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y', // 가로 막대
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { 
+            stacked: false,
+            ticks: { color: '#94a3b8', stepSize: 1 }, 
+            grid: { color: 'rgba(255,255,255,0.05)' } 
+          },
+          y: { 
+            stacked: true,
+            ticks: { color: '#e2e8f0' }, 
+            grid: { display: false } 
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
 
   // 3. 학생 포인트 랭킹 (TOP 5) - 승인된 학생만
   const allUsers = db.users || [];

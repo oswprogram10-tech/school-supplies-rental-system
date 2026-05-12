@@ -11,6 +11,7 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -201,22 +202,44 @@
       <div id="tab-dashboard" class="tab-content active">
         <div class="page-header"><h2>📊 대시보드</h2></div>
         
-        <div class="stats-overview">
-          <div class="stat-card"><h3>전체 비품</h3><p id="statTotalItems">0</p></div>
-          <div class="stat-card"><h3>대여 중</h3><p id="statBorrowed">0</p></div>
-          <div class="stat-card"><h3>대여 가능</h3><p id="statAvailable">0</p></div>
+        <div class="stats-overview-row">
+          <div class="stat-mini-card">
+            <span class="mini-icon">📦</span>
+            <div class="mini-content">
+              <span class="mini-label">전체</span>
+              <span id="statTotalItems" class="mini-value">0</span>
+            </div>
+          </div>
+          <div class="stat-mini-card">
+            <span class="mini-icon">📤</span>
+            <div class="mini-content">
+              <span class="mini-label">대여 중</span>
+              <span id="statBorrowed" class="mini-value">0</span>
+            </div>
+          </div>
+          <div class="stat-mini-card">
+            <span class="mini-icon">✅</span>
+            <div class="mini-content">
+              <span class="mini-label">대여 가능</span>
+              <span id="statAvailable" class="mini-value">0</span>
+            </div>
+          </div>
         </div>
         
-        <div class="dashboard-grid" style="display:grid; grid-template-columns: 2fr 1fr; gap:20px;">
+        <div class="dashboard-grid" style="display:grid; grid-template-columns: 1.2fr 1fr; gap:20px;">
           <!-- 왼쪽 열: 통계 및 재고 -->
           <div class="dashboard-column">
             <div class="dashboard-card">
-              <h3>📊 비품별 인기 순위</h3>
-              <div id="dashboardStatsChart" class="stats-chart-container" style="height:200px;"></div>
+              <h3>📊 인기 비품 비율 (Top 5)</h3>
+              <div style="height:220px; display:flex; justify-content:center; align-items:center;">
+                <canvas id="popularPieChart"></canvas>
+              </div>
             </div>
             <div class="dashboard-card" style="margin-top:20px;">
-              <h3>📦 비품 재고 상태 (잔여/전체)</h3>
-              <div id="dashboardInventoryList" class="inventory-list"></div>
+              <h3>📦 비품 재고 현황</h3>
+              <div style="height:320px;">
+                <canvas id="inventoryBarChart"></canvas>
+              </div>
             </div>
           </div>
           
