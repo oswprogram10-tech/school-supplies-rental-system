@@ -22,7 +22,7 @@ fdb.collection("config").doc("app").onSnapshot(doc => {
   }
 });
 
-const APP_VERSION = "Athens";
+const APP_VERSION = "Cairo";
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
@@ -863,14 +863,27 @@ function exportHistoryCSV() {
   if (!db.history.length) {
     alert("내보낼 데이터가 없습니다."); return;
   }
-  const headers = ["번호", "학생명", "아이디", "비품명", "대여일", "반납일", "상태"];
+  const headers = ["번호", "학생명", "아이디", "비품명", "대여일시", "반납일시", "상태"];
   const rows = [...db.history].sort((a,b)=>new Date(b.borrowedAt)-new Date(a.borrowedAt)).map((h, i) => {
     const itemName = db.items.find(it=>it.id===h.itemId)?.name || h.itemId;
     const status = h.returnedAt ? '반납완료' : '대여중';
-    const bDate = h.borrowedAt ? h.borrowedAt.split('T')[0] : '-';
-    const rDate = h.returnedAt ? h.returnedAt.split('T')[0] : '미반납';
     
-    // 각 필드를 따옴표로 감싸고, 날짜 등은 앞에 공백을 주어 엑셀이 숫자로 자동 변환하는 것을 방지
+    // ISO 형식을 읽기 쉬운 날짜+시간 형식으로 변환 (예: 2024-05-12 14:30:05)
+    const formatFullDate = (iso) => {
+      if (!iso) return "-";
+      const date = new Date(iso);
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mm = String(date.getMinutes()).padStart(2, '0');
+      const ss = String(date.getSeconds()).padStart(2, '0');
+      return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+    };
+
+    const bDate = formatFullDate(h.borrowedAt);
+    const rDate = h.returnedAt ? formatFullDate(h.returnedAt) : '미반납';
+    
     return [
       `"${i+1}"`,
       `"${h.studentName}"`,
