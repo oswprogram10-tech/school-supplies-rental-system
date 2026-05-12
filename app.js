@@ -22,7 +22,7 @@ fdb.collection("config").doc("app").onSnapshot(doc => {
   }
 });
 
-const APP_VERSION = "Berlin";
+const APP_VERSION = "Rome";
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
@@ -1039,8 +1039,44 @@ async function rejectUser(id) {
     renderApprovals();
   }
 }
+}
+
+// ===================== 배경 설정 기능 =====================
+function loadBackground() {
+  const customBg = localStorage.getItem('customBg');
+  if (customBg) {
+    document.body.style.backgroundImage = `url(${customBg})`;
+  } else {
+    // 사용자가 지정한 기본 이미지
+    document.body.style.backgroundImage = `url('default_bg.jpg')`;
+  }
+  document.body.style.backgroundSize = 'cover';
+  document.body.style.backgroundPosition = 'center';
+  document.body.style.backgroundAttachment = 'fixed';
+}
+
+function handleBgChange(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    localStorage.setItem('customBg', e.target.result);
+    loadBackground();
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetBackground() {
+  if (confirm('기본 배경으로 되돌리시겠습니까?')) {
+    localStorage.removeItem('customBg');
+    loadBackground();
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+  // 배경 이미지 로드
+  loadBackground();
+  
   // 저장된 테마 불러오기
   const savedTheme = localStorage.getItem('theme');
   if (savedTheme === 'light') {

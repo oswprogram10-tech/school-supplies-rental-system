@@ -29,7 +29,11 @@
 <!-- ===================== LOGIN PAGE ===================== -->
 <div id="page-login" class="page">
   <!-- Theme Toggle Button for Login -->
-  <button class="btn-icon" style="position:absolute; top:20px; right:20px; z-index:10; font-size:20px;" onclick="toggleTheme()" id="loginThemeBtn">🌙</button>
+  <div style="position:absolute; top:20px; right:20px; z-index:10; display:flex; gap:10px;">
+    <button class="btn-icon" style="font-size:20px;" onclick="resetBackground()" title="기본 배경으로 복구">🔄</button>
+    <button class="btn-icon" style="font-size:20px;" onclick="document.getElementById('bgInput').click()" title="배경 변경">🖼️</button>
+    <button class="btn-icon" style="font-size:20px;" onclick="toggleTheme()" id="loginThemeBtn" title="테마 변경">🌙</button>
+  </div>
 
   <div class="login-bg">
     <div class="login-orb orb1"></div>
@@ -169,7 +173,9 @@
       <span class="nav-title">교실 비품 관리</span>
     </div>
     <div class="nav-right">
-      <button class="btn-icon-nav" onclick="toggleTheme()" id="adminThemeBtn" style="margin-right:10px;">🌙</button>
+      <button class="btn-icon-nav" onclick="resetBackground()" title="기본 배경으로 복구">🔄</button>
+      <button class="btn-icon-nav" onclick="document.getElementById('bgInput').click()" title="배경 변경">🖼️</button>
+      <button class="btn-icon-nav" onclick="toggleTheme()" id="adminThemeBtn" style="margin-right:10px;" title="테마 변경">🌙</button>
       <div class="nav-user"><span id="adminUserName">관리자</span> <span id="adminClassBadge" class="nav-badge admin-badge">-</span></div>
       <button class="btn-logout" onclick="logout()">로그아웃</button>
     </div>
@@ -330,7 +336,9 @@
   <nav class="navbar student-nav">
     <div class="nav-brand"><span class="nav-logo">📚</span> <span class="nav-title">비품 대여</span></div>
     <div class="nav-right">
-      <button class="btn-icon-nav" onclick="toggleTheme()" id="studentThemeBtn" style="margin-right:10px;">🌙</button>
+      <button class="btn-icon-nav" onclick="resetBackground()" title="기본 배경으로 복구">🔄</button>
+      <button class="btn-icon-nav" onclick="document.getElementById('bgInput').click()" title="배경 변경">🖼️</button>
+      <button class="btn-icon-nav" onclick="toggleTheme()" id="studentThemeBtn" style="margin-right:10px;" title="테마 변경">🌙</button>
       <div class="nav-user"><span id="studentUserName">사용자</span> <span id="studentClassBadge" class="nav-badge student-badge">-</span></div>
       <button class="btn-logout" onclick="logout()">로그아웃</button>
     </div>
@@ -536,6 +544,10 @@
   </div>
 </div>
 
-<script src="app.js"></script>
+  <!-- ===================== GLOBAL UI ELEMENTS ===================== -->
+  <!-- Background Image Input -->
+  <input type="file" id="bgInput" accept="image/*" class="hidden" onchange="handleBgChange(event)" />
+
+  <script src="app.js"></script>
 </body>
 </html>
