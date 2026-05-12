@@ -22,7 +22,7 @@ fdb.collection("config").doc("app").onSnapshot(doc => {
   }
 });
 
-const APP_VERSION = "Cairo";
+const APP_VERSION = "Dublin";
 
 // ===================== DATA & STATE =====================
 const CATEGORY_EMOJI = { '문구':'✏️','도서':'📖','실험도구':'🔬','체육용품':'⚽','전자기기':'💻','기타':'📦' };
@@ -1057,15 +1057,18 @@ async function rejectUser(id) {
 // ===================== 배경 설정 기능 =====================
 function loadBackground() {
   const customBg = localStorage.getItem('customBg');
-  if (customBg) {
-    document.body.style.backgroundImage = `url(${customBg})`;
-  } else {
-    // 사용자가 지정한 기본 이미지
-    document.body.style.backgroundImage = `url('default_bg.jpg')`;
+  try {
+    if (customBg) {
+      document.body.style.backgroundImage = `url(${customBg})`;
+    } else {
+      document.body.style.backgroundImage = `url('default_bg.jpg')`;
+    }
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+  } catch (e) {
+    console.warn("Background image failed to load:", e);
   }
-  document.body.style.backgroundSize = 'cover';
-  document.body.style.backgroundPosition = 'center';
-  document.body.style.backgroundAttachment = 'fixed';
 }
 
 function handleBgChange(event) {
@@ -1100,8 +1103,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 스플래시 화면을 2.5초간 보여준 후 로그인 화면으로 이동
+  // 스플래시 화면을 1초간 보여준 후 로그인 화면으로 이동 (대기 시간 단축)
   setTimeout(() => {
     showPage('page-login');
-  }, 2500);
+  }, 1000);
 });
