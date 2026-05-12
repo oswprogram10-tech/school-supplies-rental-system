@@ -82,6 +82,52 @@ body > * { position: relative; z-index: 1; }
 .logo-icon { font-size: 52px; margin-bottom: 12px; filter: drop-shadow(0 0 20px #6366f1aa); animation: float 4s ease-in-out infinite; }
 .login-title { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #818cf8, #10b981); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .login-subtitle { color: var(--text2); margin-top: 8px; font-size: 14px; }
+
+.login-intro {
+  margin: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
+}
+.intro-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+.intro-emoji {
+  font-size: 20px;
+  background: var(--glass);
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+.intro-text b {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.intro-text p {
+  font-size: 11px;
+  color: var(--text2);
+  margin: 0;
+  line-height: 1.4;
+}
+
 .role-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
 .role-btn { background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 14px 10px; cursor: pointer; color: var(--text2); font-size: 14px; font-weight: 600; transition: all 0.25s; display: flex; flex-direction: column; align-items: center; gap: 6px; backdrop-filter: var(--blur-sm); -webkit-backdrop-filter: var(--blur-sm); }
 .role-btn:hover { border-color: var(--accent); color: var(--text); background: var(--glass-strong); }
